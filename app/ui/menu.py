@@ -2,6 +2,7 @@ from colorama import Fore, Style
 from .widgets import title, divider, pause
 from .prompts import prompt_menu_choice
 from ..core.utils import clear_screen
+from .cadastros.menu import cadastros_loop 
 
 MAIN_ITEMS = [
     "Cadastros",
@@ -27,8 +28,7 @@ def handle_main_choice(choice: str) -> bool:
     """
     match choice.lower():
         case "1":
-            print("▶ Cadastros (em construção).")
-            pause()
+            cadastros_loop()
         case "2":
             print("▶ Transações & Proventos (em construção).")
             pause()

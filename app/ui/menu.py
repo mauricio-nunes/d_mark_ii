@@ -3,6 +3,7 @@ from .widgets import title, divider, pause
 from .prompts import prompt_menu_choice
 from ..core.utils import clear_screen
 from .cadastros.menu import cadastros_loop 
+from .transacoes.menu import transacoes_loop
 
 MAIN_ITEMS = [
     "Cadastros",
@@ -30,7 +31,7 @@ def handle_main_choice(choice: str) -> bool:
         case "1":
             cadastros_loop()
         case "2":
-            print("▶ Transações & Proventos (em construção).")
+            transacoes_loop()
             pause()
         case "3":
             print("▶ Eventos Corporativos (em construção).")

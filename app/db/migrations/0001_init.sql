@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS transacoes (
   taxas TEXT DEFAULT '0',   -- Decimal string (4 casas)
   observacoes TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (corretora_id) REFERENCES corretoras(id),
   FOREIGN KEY (ticker) REFERENCES ativos(id),
   FOREIGN KEY (carteira_id) REFERENCES carteiras(id)
@@ -82,6 +84,8 @@ CREATE TABLE IF NOT EXISTS proventos (
   valor_total TEXT,      -- opcional
   observacoes TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (ticker) REFERENCES ativos(id),
   FOREIGN KEY (corretora_id) REFERENCES corretoras(id)
 );
@@ -95,7 +99,7 @@ CREATE TABLE IF NOT EXISTS eventos (
   ticker_novo INTEGER,
   data_ex TEXT NOT NULL, -- ISO date
   num INTEGER DEFAULT 0,
-  den INTEGER DEFAULT 0,
+  --den INTEGER DEFAULT 0,
   observacoes TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY (ticker_antigo) REFERENCES ativos(id),
@@ -103,12 +107,14 @@ CREATE TABLE IF NOT EXISTS eventos (
 );
 
 CREATE INDEX IF NOT EXISTS idx_eventos_data ON eventos(data_ex);
+CREATE INDEX IF NOT EXISTS idx_eventos_ticker ON eventos(ticker_antigo, ticker_novo);
+
 
 CREATE TABLE IF NOT EXISTS ticker_mapping (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ticker_antigo INTEGER NOT NULL,
   ticker_novo INTEGER NOT NULL,
-  data_vigencia TEXT NOT NULL,
+  data_vigencia DATE NOT NULL,
   FOREIGN KEY (ticker_antigo) REFERENCES ativos(id),
   FOREIGN KEY (ticker_novo) REFERENCES ativos(id)
 );

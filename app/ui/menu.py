@@ -4,6 +4,7 @@ from .prompts import prompt_menu_choice
 from ..core.utils import clear_screen
 from .cadastros.menu import cadastros_loop 
 from .transacoes.menu import transacoes_loop
+from .eventos.menu import eventos_loop
 
 MAIN_ITEMS = [
     "Cadastros",
@@ -34,8 +35,7 @@ def handle_main_choice(choice: str) -> bool:
             transacoes_loop()
             pause()
         case "3":
-            print("▶ Eventos Corporativos (em construção).")
-            pause()
+            eventos_loop()
         case "4":
             print("▶ Importação (em construção).")
             pause()

@@ -22,20 +22,11 @@ def show_menu():
 def transacoes_loop():
     keep = True
     while keep:
-        clear_screen()
-        show_menu()
+        clear_screen(); show_menu()
         ch = prompt_menu_choice().strip().lower()
         match ch:
-            case "1":
-                tela_transacoes()
-            case "2":
-                tela_proventos()
-            case "3":
-                tela_transferencia()
-            case "4" | "q" | "voltar":
-                keep = False
-            case _:
-                print("Opção inválida.")
-                pause()
-
-__all__ = ["transacoes_loop"]
+            case "1": tela_transacoes()
+            case "2": tela_proventos()
+            case "3": tela_transferencia()
+            case "4" | "q" | "voltar": keep = False
+            case _: print("Opção inválida."); pause()

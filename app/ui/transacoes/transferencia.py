@@ -1,5 +1,5 @@
 from colorama import Fore, Style
-from ..widgets import title, divider, pause, confirm
+from ..widgets import title, pause, confirm
 from ...core.utils import clear_screen
 from ...db.repositories import ativos_repo, carteiras_repo
 from ...services.transacoes_service import transferir, ValidationError

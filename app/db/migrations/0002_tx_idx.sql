@@ -1,0 +1,3 @@
+CREATE INDEX IF NOT EXISTS idx_tx_cart_data ON transacoes(carteira_id, data);
+CREATE INDEX IF NOT EXISTS idx_tx_tipo_data ON transacoes(tipo, data);
+CREATE INDEX IF NOT EXISTS idx_prov_ticker_data ON proventos(ticker, data_pagamento);

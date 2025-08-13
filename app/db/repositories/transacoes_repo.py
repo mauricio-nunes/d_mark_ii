@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from ..connection import get_conn
 
 def create(data: dict) -> int:
@@ -51,7 +51,8 @@ def list(texto: str="", ticker_id: int|None=None, carteira_id: int|None=None,
 
     rows = conn.execute(f"""
         SELECT t.id, t.data, t.tipo, t.quantidade, t.preco_unitario, t.taxas, t.observacoes,
-               a.ticker AS ticker_str, c.nome AS carteira_str, co.nome AS corretora_str
+               a.ticker AS ticker_str, t.ticker, t.carteira_id,
+               c.nome AS carteira_str, co.nome AS corretora_str
           FROM transacoes t
           JOIN ativos a ON a.id=t.ticker
           JOIN carteiras c ON c.id=t.carteira_id
@@ -75,6 +76,5 @@ def count(**kwargs) -> int:
     if kwargs.get("corretora_id"): where.append("corretora_id=?"); p.append(kwargs["corretora_id"])
     if kwargs.get("data_ini"): where.append("data>=?"); p.append(kwargs["data_ini"])
     if kwargs.get("data_fim"): where.append("data<=?"); p.append(kwargs["data_fim"])
-
     r = conn.execute(f"SELECT COUNT(*) c FROM transacoes WHERE {' AND '.join(where)};", p).fetchone()
     conn.close(); return int(r["c"])

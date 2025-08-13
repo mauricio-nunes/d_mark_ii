@@ -36,8 +36,8 @@ def get_by_id(pid: int) -> Optional[dict]:
     conn = get_conn(); r = conn.execute("SELECT * FROM proventos WHERE id=?;", (pid,)).fetchone()
     conn.close(); return dict(r) if r else None
 
-def list(texto: str="", ticker_id: int|None=None, carteira_id: int|None=None,
-         tipo: str|None=None, data_ini: str|None=None, data_fim: str|None=None,
+def list(texto: str="", ticker_id: int|None=None, tipo: str|None=None,
+         data_ini: str|None=None, data_fim: str|None=None,
          offset: int=0, limit: int=20, apenas_ativos: bool=True) -> list:
     conn = get_conn()
     where, p = ["1=1"], []
@@ -52,7 +52,7 @@ def list(texto: str="", ticker_id: int|None=None, carteira_id: int|None=None,
 
     rows = conn.execute(f"""
         SELECT p.id, p.data_pagamento, p.tipo_evento, p.valor_total, p.quantidade, p.preco_unitario,
-               a.ticker AS ticker_str, coalesce(p.descricao,'') AS descricao, coalesce(p.observacoes,'') AS observacoes
+               a.ticker AS ticker_str, p.ticker, coalesce(p.descricao,'') AS descricao, coalesce(p.observacoes,'') AS observacoes
           FROM proventos p
           JOIN ativos a ON a.id=p.ticker
          WHERE {' AND '.join(where)}

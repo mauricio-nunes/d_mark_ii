@@ -11,7 +11,7 @@ def _input(t): return input(Fore.WHITE + t + Style.RESET_ALL)
 def _header():
     title("Proventos")
     print("Tipos: DIVIDENDO | JCP | RENDIMENTO FII | AMORTIZACAO | OUTROS")
-    print("Comandos: [N] Próx. [P] Ant. [G] Ir pág. [F] Filtrar [I] Incluir [E] Editar [D] Excluir [Q] Voltar")
+    print("Comandos: [N] Próx. [P] Ant. [G] Ir pág. [F] Filtros [I] Incluir [E] Editar [D] Excluir [Q] Voltar")
     divider()
 
 def _render(rows, page, pages, total):
@@ -19,7 +19,7 @@ def _render(rows, page, pages, total):
     print("-"*110)
     for r in rows:
         print(f"{r['id']:<5} {r['data_pagamento']:<10} {r['tipo_evento']:<14} {r['ticker_str']:<8} "
-              f"{(r.get('valor_total') or ''):>14} {(r.get('quantidade') or ''):>12} {(r.get('preco_unitario') or ''):>12} {r.get('descricao','')}")
+              f"{str(r.get('valor_total') or ''):>14} {str(r.get('quantidade') or ''):>12} {str(r.get('preco_unitario') or ''):>12} {r.get('descricao','')}")
 
 def _coleta_campos(reg=None):
     if not reg:

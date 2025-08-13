@@ -1,5 +1,5 @@
-from ..db.repositories import proventos_repo, ativos_repo
 from datetime import datetime
+from ..db.repositories import proventos_repo, ativos_repo
 
 class ValidationError(Exception): ...
 

@@ -5,6 +5,7 @@ from ..core.utils import clear_screen
 from .cadastros.menu import cadastros_loop 
 from .transacoes.menu import transacoes_loop
 from .eventos.menu import eventos_loop
+from .importacao.menu import importacao_loop
 
 MAIN_ITEMS = [
     "Cadastros",
@@ -37,8 +38,7 @@ def handle_main_choice(choice: str) -> bool:
         case "3":
             eventos_loop()
         case "4":
-            print("▶ Importação (em construção).")
-            pause()
+            importacao_loop()
         case "5":
             print("▶ Consultas (em construção).")
             pause()

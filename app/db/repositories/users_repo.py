@@ -1,5 +1,15 @@
 from ..connection import get_conn
 
+def reset_tentativas(user_id: int):
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute("""
+        UPDATE users
+           SET tentativas = 0,
+               bloqueado = 0
+         WHERE id = ?;
+    """, (user_id,))
+    conn.commit(); conn.close()
+
 def get_user_by_username(username: str):
     conn = get_conn()
     row = conn.execute("SELECT * FROM users WHERE username = ?;", (username,)).fetchone()

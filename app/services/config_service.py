@@ -1,7 +1,7 @@
 from typing import TypedDict, Optional
 from ..db.repositories import config_repo
 
-# chaves
+# Chaves de configuração
 CFG_FIGLET_FONT = "ui.figlet_font"
 CFG_THEME = "ui.theme"             # "dark"|"light"
 CFG_PAGE_SIZE = "ui.page_size"     # inteiro

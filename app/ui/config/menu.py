@@ -37,7 +37,7 @@ def tela_desbloqueio():
     if conf != "DESBLOQUEAR":
         print("Cancelado."); pause(); return
     try:
-        users_repo.reset_tentativas(usr["id"])  # ver patch abaixo se não existir
+        users_repo.reset_tentativas(usr["id"])
         print("Usuário desbloqueado.")
     except Exception as e:
         print(f"Erro: {e}")

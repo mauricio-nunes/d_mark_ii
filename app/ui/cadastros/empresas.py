@@ -26,6 +26,7 @@ def _render(rows, page, pages, total, filtro, apenas_ativas):
 def _coleta_campos(reg=None):
     cnpj = _input(f"CNPJ* [{reg['cnpj']}]:" if reg else "CNPJ*: ").strip() or (reg['cnpj'] if reg else "")
     rz = _input(f"Razão social* [{reg['razao_social']}]: " if reg else "Razão social*: ").strip() or (reg['razao_social'] if reg else "")
+    cvm = _input(f"Código CVM* [{reg['codigo_cvm']}]: " if reg else "Código CVM*: ").strip() or (reg['codigo_cvm'] if reg else "")
     data_const = _input(f"Data constituição (YYYY-MM-DD) [{reg.get('data_constituicao','')}]:" if reg else "Data constituição (YYYY-MM-DD): ").strip() or (reg.get('data_constituicao','') if reg else None)
     setor = _input(f"Setor [{reg.get('setor_atividade','')}]: " if reg else "Setor: ").strip() or (reg.get('setor_atividade','') if reg else "")
     situ = _input(f"Situação [{reg.get('situacao','')}]: " if reg else "Situação: ").strip() or (reg.get('situacao','') if reg else "")
@@ -34,6 +35,7 @@ def _coleta_campos(reg=None):
     return {
         "cnpj": normalize_cnpj(cnpj),
         "razao_social": rz,
+        "codigo_cvm": cvm,
         "data_constituicao": data_const or None,
         "setor_atividade": setor,
         "situacao": situ,

@@ -34,6 +34,11 @@ def get_by_cnpj(cnpj: str) -> Optional[dict]:
     row = conn.execute("SELECT * FROM empresas WHERE cnpj = ?;", (cnpj,)).fetchone()
     conn.close(); return dict(row) if row else None
 
+def get_by_codigo_cvm(codigo_cvm: str) -> Optional[dict]:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM empresas WHERE codigo_cvm = ?;", (codigo_cvm,)).fetchone()
+    conn.close(); return dict(row) if row else None
+
 def get_by_id(eid: int) -> Optional[dict]:
     conn = get_conn()
     row = conn.execute("SELECT * FROM empresas WHERE id=?;", (eid,)).fetchone()
@@ -42,10 +47,10 @@ def get_by_id(eid: int) -> Optional[dict]:
 def create(**kwargs) -> int:
     conn = get_conn(); cur = conn.cursor()
     cur.execute("""
-        INSERT INTO empresas(cnpj, razao_social, data_constituicao, setor_atividade, situacao,
+        INSERT INTO empresas(cnpj, razao_social, codigo_cvm, data_constituicao, setor_atividade, situacao,
                              controle_acionario, tipo_empresa, ativo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1);
-    """, (kwargs["cnpj"], kwargs["razao_social"], kwargs.get("data_constituicao"),
+        VALUES (?, ?, ?,? , ?, ?, ?, ?, 1);
+    """, (kwargs["cnpj"], kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
           kwargs.get("setor_atividade"), kwargs.get("situacao"),
           kwargs.get("controle_acionario"), kwargs["tipo_empresa"]))
     conn.commit(); nid = cur.lastrowid; conn.close(); return nid
@@ -53,9 +58,9 @@ def create(**kwargs) -> int:
 def update(eid: int, **kwargs) -> None:
     conn = get_conn()
     conn.execute("""
-        UPDATE empresas SET razao_social=?, data_constituicao=?, setor_atividade=?,
+        UPDATE empresas SET razao_social=?, codigo_cvm=?, data_constituicao=?, setor_atividade=?,
             situacao=?, controle_acionario=?, tipo_empresa=? WHERE id=?;
-    """, (kwargs["razao_social"], kwargs.get("data_constituicao"),
+    """, (kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
           kwargs.get("setor_atividade"), kwargs.get("situacao"),
           kwargs.get("controle_acionario"), kwargs["tipo_empresa"], eid))
     conn.commit(); conn.close()
@@ -80,10 +85,10 @@ def upsert_by_cnpj(**kwargs) -> tuple[int, bool]:
     # Try to insert first
     try:
         cur.execute("""
-            INSERT INTO empresas(cnpj, razao_social, data_constituicao, setor_atividade, 
+            INSERT INTO empresas(cnpj, razao_social,codigo_cvm, data_constituicao, setor_atividade, 
                                 situacao, controle_acionario, tipo_empresa, ativo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-        """, (kwargs["cnpj"], kwargs["razao_social"], kwargs.get("data_constituicao"),
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (kwargs["cnpj"], kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
               kwargs.get("setor_atividade"), kwargs.get("situacao"),
               kwargs.get("controle_acionario"), kwargs["tipo_empresa"], kwargs.get("ativo", 1)))
         conn.commit()
@@ -94,10 +99,10 @@ def upsert_by_cnpj(**kwargs) -> tuple[int, bool]:
         # CNPJ already exists, update instead
         conn.rollback()
         cur.execute("""
-            UPDATE empresas SET razao_social=?, data_constituicao=?, setor_atividade=?,
+            UPDATE empresas SET razao_social=?, codigo_cvm=?, data_constituicao=?, setor_atividade=?,
                 situacao=?, controle_acionario=?, tipo_empresa=?, ativo=?
             WHERE cnpj=?;
-        """, (kwargs["razao_social"], kwargs.get("data_constituicao"),
+        """, (kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
               kwargs.get("setor_atividade"), kwargs.get("situacao"),
               kwargs.get("controle_acionario"), kwargs["tipo_empresa"], kwargs.get("ativo", 1),
               kwargs["cnpj"]))

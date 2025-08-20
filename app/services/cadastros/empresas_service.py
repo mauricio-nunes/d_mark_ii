@@ -23,12 +23,21 @@ def _check_unique_cnpj(cnpj: str, ignore_id: int | None = None):
         raise ValidationError("Já existe empresa com este CNPJ.")
     return c
 
+def _check_unique_codigo_cvm(codigo_cvm: str, ignore_id: int | None = None):
+    found = repo.get_by_codigo_cvm(codigo_cvm)
+    if found and (ignore_id is None or found["id"] != ignore_id):
+        raise ValidationError("Já existe uma empresa com este Código CVM.")
+    return codigo_cvm
+
 def criar(**data) -> int:
     cnpj = _check_unique_cnpj(data.get("cnpj",""))
     if not data.get("razao_social"): raise ValidationError("Razão social é obrigatória.")
+    if not data.get("codigo_cvm"): raise ValidationError("Código CVM é obrigatório.")
+    cvm = _check_unique_codigo_cvm(data.get("codigo_cvm",""))
     tipo = (data.get("tipo_empresa") or "").strip()
     if tipo not in ("Fundo","CiaAberta"): raise ValidationError("tipo_empresa deve ser Fundo ou CiaAberta.")
     data["cnpj"] = cnpj
+    data["codigo_cvm"] = cvm
     return repo.create(**data)
 
 def editar(eid: int, **data):

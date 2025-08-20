@@ -220,6 +220,7 @@ def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
                             pbar.update(1)
                             continue
                         
+                        codigo_cvm = row.get("Codigo_CVM", "").strip()
                         data_constituicao = _parse_cvm_date(row.get("Data_Constituicao", ""))
                         setor_atividade = row.get("Setor_Atividade", "").strip() or None
                         situacao = row.get("Situacao_Registro_CVM", "").strip() or None
@@ -232,6 +233,7 @@ def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
                         empresa_id, was_inserted = empresas_repo.upsert_by_cnpj(
                             cnpj=cnpj,
                             razao_social=razao_social,
+                            codigo_cvm=codigo_cvm,
                             data_constituicao=data_constituicao,
                             setor_atividade=setor_atividade,
                             situacao=situacao,

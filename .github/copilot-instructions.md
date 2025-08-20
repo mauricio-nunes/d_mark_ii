@@ -19,7 +19,6 @@
 - Follow repo linting rules; **do not auto-convert tabs to spaces**.  
 
 ## Database (SQLite)
-- Use context managers (`with`) for connections.  
 - Use **parameters** in queries, never string interpolation.  
 - Ensure migrations/checks before creating tables.  
 - Always close cursors/connections.  
@@ -49,11 +48,4 @@
 ## Security
 - Never expose secrets.  
 - Recommend **environment variables** for credentials.  
-- Validate/sanitize CLI user input.  
-
-## Example Chat Prompts
-- “Generate Python function to download CVM file with timeout/retry.”  
-- “Read large CSV in chunks and upsert into SQLite.”  
-- “Validate dd/mm/yyyy dates and convert to ISO.”  
-- “Suggest commit message in project’s format.”  
-- “Review PR focusing on error handling and encoding.”  
+- Validate/sanitize CLI user input.    

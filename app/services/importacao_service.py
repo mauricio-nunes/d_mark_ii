@@ -146,7 +146,7 @@ def download_cvm_file(year: int) -> str:
     # Create temp directory for download
     temp_dir = tempfile.mkdtemp()
     zip_path = os.path.join(temp_dir, f"fca_cia_aberta_{year}.zip")
-    csv_path = os.path.join(temp_dir, f"ca_cia_aberta_geral_{year}.csv")
+    csv_path = os.path.join(temp_dir, f"fca_cia_aberta_geral_{year}.csv")
     
     try:
         # Download file
@@ -164,7 +164,7 @@ def download_cvm_file(year: int) -> str:
         # Extract CSV from ZIP
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             # Look for the expected CSV file
-            expected_csv = f"ca_cia_aberta_geral_{year}.csv"
+            expected_csv = f"fca_cia_aberta_geral_{year}.csv"
             if expected_csv not in zip_ref.namelist():
                 raise Exception(f"Arquivo {expected_csv} não encontrado no ZIP")
             

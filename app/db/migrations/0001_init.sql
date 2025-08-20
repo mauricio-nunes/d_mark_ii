@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS empresas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   cnpj TEXT UNIQUE NOT NULL, -- somente dígitos
   razao_social TEXT NOT NULL,
+  codigo_cvm TEXT UNIQUE NOT NULL,
   data_constituicao TEXT, -- ISO date
   setor_atividade TEXT,
   situacao TEXT,

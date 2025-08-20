@@ -6,6 +6,7 @@ from ...db.repositories import config_repo  # assumindo que você tem um config_
 from ...services.importacao_service import (
     preview_proventos, importar_proventos,
     preview_fechamentos, importar_fechamentos,
+    import_cvm_companies,
     CFG_PROV_MAP, CFG_FECH_MAP, ValidationError
 )
 from ...core.xlsx import list_sheets
@@ -99,15 +100,58 @@ def configurar_mapeamento_flow():
         elif ch == "2": _editar_mapeamento(CFG_FECH_MAP, DEFAULT_MAP_FECH)
         else: break
 
+def importar_empresas_cvm_flow():
+    """Import CVM companies with year selection."""
+    clear_screen(); title("Importar Cadastro Empresas CVM")
+    
+    from datetime import datetime
+    current_year = datetime.now().year
+    
+    year_input = _input(f"Ano [{current_year}]: ").strip()
+    
+    if year_input:
+        try:
+            year = int(year_input)
+            if year < 2010:
+                print("Erro: Ano deve ser ≥ 2010")
+                pause()
+                return
+        except ValueError:
+            print("Erro: Ano inválido")
+            pause()
+            return
+    else:
+        year = current_year
+    
+    print(f"Iniciando importação de empresas CVM para o ano {year}...")
+    print("Isso pode levar alguns minutos...")
+    
+    try:
+        inserted, updated, errors = import_cvm_companies(year)
+        
+        clear_screen(); title("Importação CVM Concluída")
+        print(f"Ano: {year}")
+        print(f"Empresas incluídas: {inserted}")
+        print(f"Empresas atualizadas: {updated}")
+        print(f"Erros: {errors}")
+        print(f"Total processado: {inserted + updated + errors}")
+        
+    except Exception as e:
+        print(f"Erro durante importação: {e}")
+    
+    pause()
+
 def importacao_loop():
     while True:
-        clear_screen(); title("Importação (XLSX)")
+        clear_screen(); title("Importação")
         print("1. Proventos (XLSX)")
         print("2. Fechamento Mensal (XLSX)")
-        print("3. Configurar Mapeamento de Colunas")
-        print("4. Voltar")
+        print("3. Cadastro Empresas CVM")
+        print("4. Configurar Mapeamento de Colunas")
+        print("5. Voltar")
         ch = _input("> ").strip()
         if ch == "1": importar_proventos_flow()
         elif ch == "2": importar_fechamentos_flow()
-        elif ch == "3": configurar_mapeamento_flow()
+        elif ch == "3": importar_empresas_cvm_flow()
+        elif ch == "4": configurar_mapeamento_flow()
         else: break

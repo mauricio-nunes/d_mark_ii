@@ -4,13 +4,17 @@ import csv
 import zipfile
 import requests
 import tempfile
+import hashlib
+import re
+import glob
 from datetime import datetime
 from tqdm import tqdm
 from ..core.xlsx import read_xlsx_rows, list_sheets
-from ..core.decimal_ctx import D
+from ..core.decimal_ctx import D, money, qty
 from ..core.daterules import parse_year_month_from_sheet, last_business_day
 from ..core.utils import normalize_cnpj
 from ..db.repositories import ativos_repo, proventos_repo, fechamentos_repo, empresas_repo
+from ..db.repositories import movimentacao_repo
 from ..db.repositories import users_repo  # só para garantir conexão se precisar
 
 class ValidationError(Exception): ...
@@ -263,3 +267,282 @@ def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
                 os.rmdir(os.path.dirname(csv_path))
         except:
             pass  # Ignore cleanup errors
+
+# --------- MOVIMENTAÇÃO B3 ---------
+
+def _normalize_string(s: str) -> str:
+	"""Normaliza string para minúsculas sem acentos"""
+	if not s:
+		return ""
+	# Remove acentos básicos
+	replacements = {
+		'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a', 'ä': 'a',
+		'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
+		'í': 'i', 'ì': 'i', 'î': 'i', 'ï': 'i',
+		'ó': 'o', 'ò': 'o', 'õ': 'o', 'ô': 'o', 'ö': 'o',
+		'ú': 'u', 'ù': 'u', 'û': 'u', 'ü': 'u',
+		'ç': 'c', 'ñ': 'n'
+	}
+	normalized = s.lower()
+	for old, new in replacements.items():
+		normalized = normalized.replace(old, new)
+	return normalized.strip()
+
+def _parse_date(date_str: str) -> str:
+	"""Converte data de dd/mm/aaaa para YYYY-MM-DD"""
+	if not date_str:
+		return ""
+	try:
+		# Tentar formato dd/mm/aaaa primeiro
+		if '/' in date_str:
+			parts = date_str.split('/')
+			if len(parts) == 3:
+				day, month, year = parts
+				return f"{year.zfill(4)}-{month.zfill(2)}-{day.zfill(2)}"
+		
+		# Se já estiver em formato ISO, retornar como está
+		if re.match(r'\d{4}-\d{2}-\d{2}', date_str):
+			return date_str
+			
+		# Tentar parse com datetime
+		dt = datetime.strptime(date_str, "%d/%m/%Y")
+		return dt.strftime("%Y-%m-%d")
+	except:
+		raise ValidationError(f"Data inválida: {date_str}. Use formato dd/mm/aaaa")
+
+def _normalize_decimal(value_str: str) -> str:
+	"""Normaliza valores decimais removendo separadores de milhares e convertendo vírgula para ponto"""
+	if not value_str:
+		return "0"
+	
+	# Remove espaços e caracteres extras
+	clean = str(value_str).strip().replace(' ', '')
+	
+	# Se contém vírgula como decimal (padrão brasileiro)
+	if ',' in clean:
+		# Se tem ponto E vírgula, ponto é separador de milhares
+		if '.' in clean and clean.rindex('.') < clean.rindex(','):
+			clean = clean.replace('.', '')  # Remove separador de milhares
+		clean = clean.replace(',', '.')  # Vírgula vira decimal
+	
+	# Remove separadores de milhares restantes (se houver mais de um ponto)
+	parts = clean.split('.')
+	if len(parts) > 2:
+		# Mantém apenas o último ponto como decimal
+		decimal_part = parts[-1]
+		integer_part = ''.join(parts[:-1])
+		clean = f"{integer_part}.{decimal_part}"
+	
+	return clean
+
+def _parse_produto(produto_str: str) -> tuple[str, str, str]:
+	"""
+	Decompõe o campo Produto em código, código_negociacao e ativo_descricao
+	Exemplo: "PETR4 - PETROBRAS PN N2" -> ("PETR4", "PETR4", "PETROBRAS PN N2")
+	"""
+	if not produto_str:
+		return "", "", ""
+	
+	# Padrão: CODIGO - DESCRICAO ou CODIGO DESCRICAO
+	parts = produto_str.split(' - ', 1)
+	if len(parts) == 2:
+		codigo = parts[0].strip()
+		descricao = parts[1].strip()
+		return codigo, codigo, descricao
+	
+	# Se não tem separador, pega primeira palavra como código
+	words = produto_str.split()
+	if words:
+		codigo = words[0]
+		descricao = produto_str
+		return codigo, codigo, descricao
+	
+	return "", "", produto_str
+
+def _calculate_hash(row_data: dict) -> str:
+	"""Calcula SHA-256 da linha normalizada para idempotência"""
+	# Criar string normalizada dos campos principais
+	hash_string = f"{row_data['data']}|{row_data['movimentacao']}|{row_data['tipo_movimentacao']}|{row_data['codigo']}|{row_data['quantidade']}|{row_data['preco_unitario']}|{row_data.get('valor_total_operacao', '')}"
+	return hashlib.sha256(hash_string.encode('utf-8')).hexdigest()
+
+def find_movimentacao_files(imports_dir: str = "imports") -> list[str]:
+	"""Encontra arquivos de movimentação na pasta imports"""
+	pattern = os.path.join(imports_dir, "movimentacao_*.xlsx")
+	files = glob.glob(pattern)
+	
+	# Filtrar apenas arquivos com padrão válido
+	valid_files = []
+	for file in files:
+		basename = os.path.basename(file)
+		# Padrão: movimentacao_{mes}_{ano}.xlsx ou movimentacao_{ano}.xlsx
+		if re.match(r'movimentacao_(\d{1,2}_)?\d{4}\.xlsx$', basename):
+			valid_files.append(file)
+	
+	return sorted(valid_files)
+
+def preview_movimentacao(path: str, sheet: str = None) -> List[dict]:
+	"""Preview das primeiras linhas do arquivo de movimentação"""
+	# Usar primeira aba se não especificada
+	if not sheet:
+		sheets = list_sheets(path)
+		sheet = sheets[0] if sheets else None
+	
+	rows = read_xlsx_rows(path, sheet)
+	
+	# Mapear colunas esperadas (assumindo padrão B3)
+	expected_columns = {
+		"Data": "data",
+		"Movimentação": "movimentacao", 
+		"Produto": "produto",
+		"Quantidade": "quantidade",
+		"Preço unitário": "preco_unitario",
+		"Valor da Operação": "valor_total_operacao"
+	}
+	
+	preview_data = []
+	for i, row in enumerate(rows[:10]):  # Apenas 10 primeiras linhas
+		try:
+			# Mapear campos
+			mapped_row = {}
+			for excel_col, field_name in expected_columns.items():
+				value = row.get(excel_col, "")
+				mapped_row[field_name] = value
+			
+			# Processar campos básicos para preview
+			if mapped_row.get("data"):
+				try:
+					mapped_row["data"] = _parse_date(str(mapped_row["data"]))
+				except:
+					pass
+			
+			if mapped_row.get("produto"):
+				codigo, codigo_neg, descricao = _parse_produto(str(mapped_row["produto"]))
+				mapped_row["codigo"] = codigo
+				mapped_row["ativo_descricao"] = descricao
+			
+			preview_data.append(mapped_row)
+		except Exception:
+			continue
+	
+	return preview_data
+
+def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, int]:
+	"""
+	Importa arquivo de movimentação da B3
+	Returns (inseridas, atualizadas, ignoradas, erros)
+	"""
+	# Usar primeira aba se não especificada
+	if not sheet:
+		sheets = list_sheets(path)
+		sheet = sheets[0] if sheets else None
+		if not sheet:
+			raise ValidationError("Arquivo não possui abas válidas")
+	
+	rows = read_xlsx_rows(path, sheet)
+	
+	# Mapear colunas esperadas
+	expected_columns = {
+		"Data": "data",
+		"Movimentação": "movimentacao",
+		"Produto": "produto", 
+		"Quantidade": "quantidade",
+		"Preço unitário": "preco_unitario",
+		"Valor da Operação": "valor_total_operacao"
+	}
+	
+	inseridas = 0
+	atualizadas = 0
+	ignoradas = 0
+	erros = 0
+	
+	# Processa em transação única
+	from ..db.connection import get_conn
+	conn = get_conn()
+	
+	try:
+		conn.execute("BEGIN TRANSACTION;")
+		
+		for row in rows:
+			try:
+				# Mapear campos do Excel
+				data_raw = str(row.get("Data", "")).strip()
+				movimentacao_raw = str(row.get("Movimentação", "")).strip()
+				produto_raw = str(row.get("Produto", "")).strip()
+				quantidade_raw = str(row.get("Quantidade", "")).strip()
+				preco_raw = str(row.get("Preço unitário", "")).strip()
+				valor_raw = str(row.get("Valor da Operação", "")).strip()
+				
+				# Ignorar linhas vazias
+				if not data_raw or not movimentacao_raw or not produto_raw:
+					ignoradas += 1
+					continue
+				
+				# Transformar dados
+				data = _parse_date(data_raw)
+				movimentacao = _normalize_string(movimentacao_raw)
+				
+				# Determinar tipo de movimentação
+				if "credito" in movimentacao or "entrada" in movimentacao:
+					tipo_movimentacao = "credito"
+				elif "debito" in movimentacao or "saida" in movimentacao:
+					tipo_movimentacao = "debito"
+				else:
+					# Assumir crédito por padrão
+					tipo_movimentacao = "credito"
+				
+				# Processar produto
+				codigo, codigo_negociacao, ativo_descricao = _parse_produto(produto_raw)
+				
+				# Processar valores numéricos
+				quantidade_decimal = _normalize_decimal(quantidade_raw)
+				quantidade = str(abs(qty(quantidade_decimal)))  # Sempre positivo
+				
+				preco_unitario_decimal = _normalize_decimal(preco_raw)
+				preco_unitario = str(money(preco_unitario_decimal).quantize(D("0.001")))  # 3 casas decimais
+				
+				# Valor total (pode ser NULL para subscrições)
+				valor_total_operacao = None
+				if valor_raw and valor_raw.lower() not in ("", "0", "null", "none"):
+					valor_decimal = _normalize_decimal(valor_raw)
+					valor_total = abs(money(valor_decimal))
+					if valor_total > 0:
+						valor_total_operacao = str(valor_total)
+				
+				# Preparar dados para inserção
+				row_data = {
+					"data": data,
+					"movimentacao": movimentacao,
+					"tipo_movimentacao": tipo_movimentacao,
+					"codigo": codigo,
+					"codigo_negociacao": codigo_negociacao if codigo_negociacao != codigo else None,
+					"ativo_descricao": ativo_descricao,
+					"quantidade": quantidade,
+					"preco_unitario": preco_unitario,
+					"valor_total_operacao": valor_total_operacao
+				}
+				
+				# Calcular hash
+				hash_linha = _calculate_hash(row_data)
+				
+				# Fazer upsert
+				_, was_inserted = movimentacao_repo.upsert(hash_linha, **row_data)
+				
+				if was_inserted:
+					inseridas += 1
+				else:
+					atualizadas += 1
+					
+			except Exception as e:
+				erros += 1
+				print(f"Erro ao processar linha: {e}")
+				continue
+		
+		conn.execute("COMMIT;")
+		
+	except Exception as e:
+		conn.execute("ROLLBACK;")
+		raise ValidationError(f"Erro na importação: {e}")
+	finally:
+		conn.close()
+	
+	return inseridas, atualizadas, ignoradas, erros

@@ -1,3 +1,4 @@
+import os
 from colorama import Fore, Style
 from ..widgets import title, divider, pause, confirm
 from ..prompts import prompt_menu_choice
@@ -7,6 +8,7 @@ from ...services.importacao_service import (
     preview_proventos, importar_proventos,
     preview_fechamentos, importar_fechamentos,
     import_cvm_companies,
+    find_movimentacao_files, preview_movimentacao, importar_movimentacao,
     CFG_PROV_MAP, CFG_FECH_MAP, ValidationError
 )
 from ...core.xlsx import list_sheets
@@ -141,17 +143,107 @@ def importar_empresas_cvm_flow():
     
     pause()
 
+def importar_movimentacao_b3_flow():
+	clear_screen(); title("Importar Movimentação da B3")
+	
+	# Encontrar arquivos na pasta imports
+	files = find_movimentacao_files()
+	
+	if not files:
+		print("Nenhum arquivo de movimentação encontrado na pasta 'imports'.")
+		print("Procure por arquivos no padrão: movimentacao_MM_AAAA.xlsx ou movimentacao_AAAA.xlsx")
+		pause()
+		return
+	
+	# Se múltiplos arquivos, deixar usuário escolher
+	if len(files) == 1:
+		selected_file = files[0]
+		print(f"Arquivo encontrado: {os.path.basename(selected_file)}")
+	else:
+		print("Múltiplos arquivos encontrados:")
+		for i, file in enumerate(files, 1):
+			print(f"{i}. {os.path.basename(file)}")
+		
+		try:
+			choice = int(_input("Escolha o arquivo (número): ").strip())
+			if 1 <= choice <= len(files):
+				selected_file = files[choice - 1]
+			else:
+				print("Opção inválida.")
+				pause()
+				return
+		except ValueError:
+			print("Entrada inválida.")
+			pause()
+			return
+	
+	print(f"\nProcessando arquivo: {os.path.basename(selected_file)}")
+	
+	try:
+		# Preview dos dados
+		preview_data = preview_movimentacao(selected_file)
+		
+		if not preview_data:
+			print("Arquivo não contém dados válidos para importação.")
+			pause()
+			return
+		
+		print(f"\nPreview das primeiras linhas:")
+		print("-" * 80)
+		for i, row in enumerate(preview_data[:5], 1):
+			print(f"Linha {i}:")
+			print(f"  Data: {row.get('data', 'N/A')}")
+			print(f"  Movimentação: {row.get('movimentacao', 'N/A')}")
+			print(f"  Código: {row.get('codigo', 'N/A')}")
+			print(f"  Ativo: {row.get('ativo_descricao', 'N/A')}")
+			print(f"  Quantidade: {row.get('quantidade', 'N/A')}")
+			print(f"  Preço Unit.: {row.get('preco_unitario', 'N/A')}")
+			print()
+		
+		if len(preview_data) > 5:
+			print(f"... e mais {len(preview_data) - 5} linhas")
+		
+		print("-" * 80)
+		
+		# Confirmar importação
+		if confirm("Confirmar importação? (S/N) "):
+			inseridas, atualizadas, ignoradas, erros = importar_movimentacao(selected_file)
+			
+			# Relatório final
+			clear_screen(); title("Importação de Movimentação Concluída")
+			print(f"Arquivo: {os.path.basename(selected_file)}")
+			print(f"Linhas inseridas: {inseridas}")
+			print(f"Linhas atualizadas: {atualizadas}")
+			print(f"Linhas ignoradas: {ignoradas}")
+			print(f"Erros: {erros}")
+			print(f"Total processado: {inseridas + atualizadas + ignoradas + erros}")
+			
+			if erros > 0:
+				print(f"\n⚠️  {erros} linhas com erro foram ignoradas.")
+			
+			if atualizadas > 0:
+				print(f"ℹ️  {atualizadas} linhas já existiam e foram atualizadas.")
+		
+	except ValidationError as e:
+		print(f"Erro: {e}")
+	except Exception as e:
+		print(f"Erro inesperado: {e}")
+	
+	pause()
+
 def importacao_loop():
     while True:
         clear_screen(); title("Importação")
         print("1. Proventos (XLSX)")
         print("2. Fechamento Mensal (XLSX)")
         print("3. Cadastro Empresas CVM")
-        print("4. Configurar Mapeamento de Colunas")
-        print("5. Voltar")
+        print("4. Importar Movimentação da B3")
+        print("5. Configurar Mapeamento de Colunas")
+        print("6. Voltar")
         ch = _input("> ").strip()
         if ch == "1": importar_proventos_flow()
         elif ch == "2": importar_fechamentos_flow()
         elif ch == "3": importar_empresas_cvm_flow()
-        elif ch == "4": configurar_mapeamento_flow()
+        elif ch == "4": importar_movimentacao_b3_flow()
+        elif ch == "5": configurar_mapeamento_flow()
         else: break

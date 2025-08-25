@@ -83,32 +83,47 @@ def upsert_by_cnpj(**kwargs) -> tuple[int, bool]:
     conn = get_conn(); cur = conn.cursor()
     
     # Try to insert first
-    try:
+        
+    # Get the ID and controle_id of the updated record
+    row = conn.execute("SELECT id,controle_id FROM empresas WHERE cnpj=?;", (kwargs["cnpj"],)).fetchone()
+    
+    # Insert if not exists
+    if row is None:
         cur.execute("""
-            INSERT INTO empresas(cnpj, razao_social,codigo_cvm, data_constituicao, setor_atividade, 
-                                situacao, controle_acionario, tipo_empresa, ativo)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            INSERT INTO empresas(cnpj, razao_social, codigo_cvm, data_constituicao, setor_atividade,
+                                    situacao, controle_acionario, tipo_empresa,categoria_registro, controle_id,
+                                    pais_origem, pais_custodia, situacao_emissor, dia_encerramento_fiscal,
+                                    mes_encerramento_fiscal, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (kwargs["cnpj"], kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
-              kwargs.get("setor_atividade"), kwargs.get("situacao"),
-              kwargs.get("controle_acionario"), kwargs["tipo_empresa"], kwargs.get("ativo", 1)))
+                kwargs.get("setor_atividade"), kwargs.get("situacao"),
+                kwargs.get("controle_acionario"), kwargs["tipo_empresa"], kwargs["categoria_registro"], kwargs.get("controle_id"),
+                kwargs.get("pais_origem"), kwargs.get("pais_custodia"), kwargs.get("situacao_emissor"),
+                kwargs.get("dia_encerramento_fiscal"), kwargs.get("mes_encerramento_fiscal"), kwargs.get("ativo", 1)))
         conn.commit()
         nid = cur.lastrowid
         conn.close()
-        return nid, True
-    except:
-        # CNPJ already exists, update instead
-        conn.rollback()
+        return nid, 1
+
+    # Update if controle_id is older
+    if int(row['controle_id']) < int(kwargs.get("controle_id", 0)):
+
         cur.execute("""
             UPDATE empresas SET razao_social=?, codigo_cvm=?, data_constituicao=?, setor_atividade=?,
-                situacao=?, controle_acionario=?, tipo_empresa=?, ativo=?
-            WHERE cnpj=?;
-        """, (kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
-              kwargs.get("setor_atividade"), kwargs.get("situacao"),
-              kwargs.get("controle_acionario"), kwargs["tipo_empresa"], kwargs.get("ativo", 1),
-              kwargs["cnpj"]))
+                situacao=?, controle_acionario=?, tipo_empresa=?, categoria_registro=?, controle_id=?,
+                pais_origem=?, pais_custodia=?, situacao_emissor=?, dia_encerramento_fiscal=?,
+                mes_encerramento_fiscal=?, ativo=?, atualizado_em=datetime('now')
+                WHERE cnpj=?;
+            """, (kwargs["razao_social"], kwargs["codigo_cvm"], kwargs.get("data_constituicao"),
+                    kwargs.get("setor_atividade"), kwargs.get("situacao"),
+                    kwargs.get("controle_acionario"), kwargs["tipo_empresa"], kwargs.get("categoria_registro"),
+                    kwargs.get("controle_id"), kwargs.get("pais_origem"), kwargs.get("pais_custodia"),
+                    kwargs.get("situacao_emissor"), kwargs.get("dia_encerramento_fiscal"),
+                    kwargs.get("mes_encerramento_fiscal"), kwargs.get("ativo", 1),
+                    kwargs["cnpj"]))
         conn.commit()
-        
-        # Get the ID of the updated record
-        row = conn.execute("SELECT id FROM empresas WHERE cnpj=?;", (kwargs["cnpj"],)).fetchone()
-        conn.close()
-        return row["id"] if row else None, False
+        return row['id'], 2
+
+    # If controle_id is not older, do nothing
+    return 0, 0
+

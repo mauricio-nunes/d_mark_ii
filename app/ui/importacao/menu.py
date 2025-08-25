@@ -7,7 +7,7 @@ from ...db.repositories import config_repo  # assumindo que você tem um config_
 from ...services.importacao_service import (
     preview_proventos, importar_proventos,
     preview_fechamentos, importar_fechamentos,
-    import_cvm_companies,
+    import_cvm_companies, import_cvm_valores_mobiliarios,
     find_movimentacao_files, preview_movimentacao, importar_movimentacao,
     CFG_PROV_MAP, CFG_FECH_MAP, ValidationError
 )
@@ -129,15 +129,58 @@ def importar_empresas_cvm_flow():
     print("Isso pode levar alguns minutos...")
     
     try:
-        inserted, updated, errors = import_cvm_companies(year)
+        inserted, updated, ignored, errors = import_cvm_companies(year)
         
         clear_screen(); title("Importação CVM Concluída")
         print(f"Ano: {year}")
         print(f"Empresas incluídas: {inserted}")
         print(f"Empresas atualizadas: {updated}")
+        print(f"Empresas ignoradas: {ignored}")
         print(f"Erros: {errors}")
-        print(f"Total processado: {inserted + updated + errors}")
+        print(f"Total processado: {inserted + updated + ignored + errors}")
+
+    except Exception as e:
+        print(f"Erro durante importação: {e}")
+    
+    pause()
+
+def importar_valores_mobiliarios_flow():
+    """Import CVM valores mobiliarios with year selection."""
+    clear_screen(); title("Importar Cadastro Valores Mobiliarios CVM")
+    
+    from datetime import datetime
+    current_year = datetime.now().year
+    
+    year_input = _input(f"Ano [{current_year}]: ").strip()
+    
+    if year_input:
+        try:
+            year = int(year_input)
+            if year < 2010:
+                print("Erro: Ano deve ser ≥ 2010")
+                pause()
+                return
+        except ValueError:
+            print("Erro: Ano inválido")
+            pause()
+            return
+    else:
+        year = current_year
+    
+    print(f"Iniciando importação de valores mobiliarios CVM para o ano {year}...")
+    print("Isso pode levar alguns minutos...")
+    
+    try:
+        inserted, updated, ignored, errors = import_cvm_valores_mobiliarios(year)
         
+        clear_screen(); title("Importação valores mobiliarios CVM Concluída")
+        print(f"Ano: {year}")
+        print(f"Valores Mobiliarios incluídos: {inserted}")
+        print(f"Valores Mobiliarios atualizados: {updated}")
+        print(f"Valores Mobiliarios ignorados: {ignored}")
+        print(f"Erros: {errors}")
+        print(f"Total processado: {inserted + updated + ignored + errors}")
+
     except Exception as e:
         print(f"Erro durante importação: {e}")
     
@@ -236,14 +279,16 @@ def importacao_loop():
         clear_screen(); title("Importação")
         print("1. Proventos (XLSX)")
         print("2. Fechamento Mensal (XLSX)")
-        print("3. Cadastro Empresas CVM")
-        print("4. Importar Movimentação da B3")
-        print("5. Configurar Mapeamento de Colunas")
-        print("6. Voltar")
+        print("3. [CVM] Cadastro Empresas")
+        print("4. [CVM] Valores Mobiliários")
+        print("5. Importar Movimentação da B3")
+        print("6. Configurar Mapeamento de Colunas")
+        print("7. Voltar")
         ch = _input("> ").strip()
         if ch == "1": importar_proventos_flow()
         elif ch == "2": importar_fechamentos_flow()
         elif ch == "3": importar_empresas_cvm_flow()
-        elif ch == "4": importar_movimentacao_b3_flow()
-        elif ch == "5": configurar_mapeamento_flow()
+        elif ch == "4": importar_valores_mobiliarios_flow()
+        elif ch == "5": importar_movimentacao_b3_flow()
+        elif ch == "6": configurar_mapeamento_flow()
         else: break

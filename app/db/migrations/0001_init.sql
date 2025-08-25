@@ -38,8 +38,18 @@ CREATE TABLE IF NOT EXISTS empresas (
   situacao TEXT,
   controle_acionario TEXT,
   tipo_empresa TEXT NOT NULL, -- 'Fundo' | 'CiaAberta'
-  ativo INTEGER NOT NULL DEFAULT 1
+  categoria_registro TEXT NOT NULL,
+  controle_id INTEGER NOT NULL, -- numero de controle para upsert caso a empresa já exista
+  pais_origem TEXT NOT NULL,
+  pais_custodia TEXT NOT NULL,
+  situacao_emissor TEXT NOT NULL, 
+  dia_encerramento_fiscal INTEGER NOT NULL,
+  mes_encerramento_fiscal INTEGER NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
 
 CREATE TABLE IF NOT EXISTS ativos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +57,19 @@ CREATE TABLE IF NOT EXISTS ativos (
   nome TEXT NOT NULL,
   classe TEXT NOT NULL, -- 'Acao' | 'FII' | 'Tesouro' | 'BDR' | 'ETF'
   empresa_id INTEGER,
+  controle_id INTEGER NOT NULL,
+  valor_mobiliario TEXT NOT NULL,
+  sigla_classe_acao TEXT  NULL,
+  classe_acao TEXT  NULL,
+  composicao TEXT NULL,
+  mercado TEXT NOT NULL, -- 'B3' | 'OTC' | 'NYSE' | 'NASDAQ' | 'ARCA' | 'AMEX' | 'OTHER'
+  data_inicio_negociacao TEXT NOT NULL, -- ISO date
+  data_fim_negociacao TEXT NULL, -- ISO date
+  segmento TEXT NOT NULL DEFAULT 0,
+  importado INTEGER NOT NULL DEFAULT 0, -- 0=manual, 1=importado
   ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (empresa_id) REFERENCES empresas(id)
 );
 

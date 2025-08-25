@@ -14,7 +14,7 @@ from ..core.decimal_ctx import D, money, qty
 from ..core.daterules import parse_year_month_from_sheet, last_business_day
 from ..core.utils import normalize_cnpj
 from ..db.repositories import ativos_repo, proventos_repo, fechamentos_repo, empresas_repo
-from ..db.repositories import movimentacao_repo
+from ..db.repositories import movimentacao_repo , valor_mobiliario_repo
 from ..db.repositories import users_repo  # só para garantir conexão se precisar
 
 class ValidationError(Exception): ...
@@ -27,6 +27,16 @@ CFG_FECH_MAP = "xlsx_map_fechamentos"   # json str
 
 def _normalize(s: str | None) -> str:
     return (s or "").strip()
+
+TICKER_REGEX = re.compile(r'^[A-Z]{3,4}[0-9]{1,2}$')
+def validar_ticker_b3(ticker: str) -> bool:
+    """
+    Valida se uma string é um possível código de negociação da B3.
+    """
+    if bool(TICKER_REGEX.match(ticker.upper())):
+        return ticker.upper()
+    
+    return False
 
 def _get_or_create_ativo_by_ticker_str(ticker_str: str) -> int | None:
     a = ativos_repo.get_by_ticker(ticker_str)
@@ -120,7 +130,7 @@ def importar_fechamentos(path: str, sheet: str, colmap: dict) -> Tuple[int,int]:
             skip += 1
     return ok, skip
 
-# --------- CVM COMPANIES IMPORT ---------
+# --------- CVM IMPORT ---------
 
 def _parse_cvm_date(date_str: str) -> str | None:
     """Parse CVM date format to ISO date (YYYY-MM-DD) or return None if invalid."""
@@ -183,10 +193,53 @@ def download_cvm_file(year: int) -> str:
     except Exception as e:
         raise Exception(f"Erro no processamento: {e}")
 
-def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
+def download_cvm_valor_mobiliario_file(year: int) -> str:
+    """
+    Download CVM file for the given year and return path to extracted CSV.
+    Raises Exception if download or extraction fails.
+    """
+    url = f"https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/FCA/DADOS/fca_cia_aberta_{year}.zip"
+    
+    # Create temp directory for download
+    temp_dir = tempfile.mkdtemp()
+    zip_path = os.path.join(temp_dir, f"fca_cia_aberta_{year}.zip")
+    csv_path = os.path.join(temp_dir, f"fca_cia_aberta_valor_mobiliario_{year}.csv")
+
+    try:
+        # Download file
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        
+        total_size = int(response.headers.get('content-length', 0))
+        with open(zip_path, 'wb') as f:
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc="Baixando") as pbar:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        pbar.update(len(chunk))
+        
+        # Extract CSV from ZIP
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Look for the expected CSV file
+            expected_csv = f"fca_cia_aberta_valor_mobiliario_{year}.csv"
+            if expected_csv not in zip_ref.namelist():
+                raise Exception(f"Arquivo {expected_csv} não encontrado no ZIP")
+            
+            zip_ref.extract(expected_csv, temp_dir)
+        
+        return csv_path
+        
+    except requests.RequestException as e:
+        raise Exception(f"Erro ao baixar arquivo da CVM: {e}")
+    except zipfile.BadZipFile:
+        raise Exception("Arquivo ZIP corrompido")
+    except Exception as e:
+        raise Exception(f"Erro no processamento: {e}")
+
+def import_cvm_companies(year: int | None = None) -> tuple[int, int, int, int]:
     """
     Import CVM companies for the given year (default: current year).
-    Returns (inserted_count, updated_count, error_count).
+    Returns (inserted_count, updated_count, ignored_count, error_count).
     """
     if year is None:
         year = datetime.now().year
@@ -198,8 +251,8 @@ def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
     csv_path = download_cvm_file(year)
     
     try:
-        inserted, updated, errors = 0, 0, 0
-        
+        inserted, updated, ignored, errors = 0, 0, 0, 0
+
         # Count total rows for progress bar
         with open(csv_path, 'r', encoding='latin1') as f:
             total_rows = sum(1 for _ in csv.DictReader(f, delimiter=';')) - 1  # Subtract header
@@ -229,7 +282,14 @@ def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
                         setor_atividade = row.get("Setor_Atividade", "").strip() or None
                         situacao = row.get("Situacao_Registro_CVM", "").strip() or None
                         controle_acionario = row.get("Especie_Controle_Acionario", "").strip() or None
-                        
+                        categoria_registro = row.get("Categoria_Registro_CVM", "").strip() or None
+                        controle_id = row.get("ID_Documento", "").strip() or None
+                        pais_origem = row.get("Pais_Origem", "").strip() or None
+                        pais_custodia = row.get("Pais_Custodia_Valores_Mobiliarios", "").strip() or None
+                        situacao_emissor = row.get("Situacao_Emissor", "").strip() or None
+                        dia_encerramento_fiscal = row.get("Dia_Encerramento_Exercicio_Social", "").strip() or None
+                        mes_encerramento_fiscal = row.get("Mes_Encerramento_Exercicio_Social", "").strip() or None
+
                         # Set ativo based on situacao
                         ativo = 1 if situacao == "Ativo" else 0
                         
@@ -243,20 +303,146 @@ def import_cvm_companies(year: int | None = None) -> tuple[int, int, int]:
                             situacao=situacao,
                             controle_acionario=controle_acionario,
                             tipo_empresa="CiaAberta",
-                            ativo=ativo
+                            ativo=ativo,
+                            categoria_registro=categoria_registro,
+                            controle_id=controle_id,
+                            pais_origem=pais_origem,
+                            pais_custodia=pais_custodia,
+                            situacao_emissor=situacao_emissor,
+                            dia_encerramento_fiscal=dia_encerramento_fiscal,
+                            mes_encerramento_fiscal=mes_encerramento_fiscal
                         )
-                        
-                        if was_inserted:
+
+                        if was_inserted == 1:
                             inserted += 1
-                        else:
+                        elif was_inserted == 2:
                             updated += 1
-                            
+                        else:
+                            ignored += 1
+
                     except Exception as e:
                         errors += 1
                     
                     pbar.update(1)
         
-        return inserted, updated, errors
+        return inserted, updated, ignored, errors
+        
+    finally:
+        # Cleanup temp files
+        try:
+            if os.path.exists(csv_path):
+                os.remove(csv_path)
+            if os.path.exists(os.path.dirname(csv_path)):
+                os.rmdir(os.path.dirname(csv_path))
+        except:
+            pass  # Ignore cleanup errors
+
+def import_cvm_valores_mobiliarios(year: int | None = None) -> tuple[int, int, int, int]:
+    """
+    Import CVM Valores Mobiliarios for the given year (default: current year).
+    Returns (inserted_count, updated_count,ignored_count, error_count).
+    """
+    if year is None:
+        year = datetime.now().year
+    
+    if year < 2010:
+        raise ValidationError("Ano deve ser maior ou igual a 2010")
+    
+    # Download and extract file
+    csv_path = download_cvm_valor_mobiliario_file(year)
+    
+    try:
+        inserted, updated, ignored, errors = 0, 0, 0, 0
+
+        # Count total rows for progress bar
+        with open(csv_path, 'r', encoding='latin1') as f:
+            total_rows = sum(1 for _ in csv.DictReader(f, delimiter=';')) - 1  # Subtract header
+        
+        # Process CSV file
+        with open(csv_path, 'r', encoding='latin1') as f:
+            reader = csv.DictReader(f, delimiter=';')
+            
+            with tqdm(total=total_rows, desc="Processando empresas", unit="empresas") as pbar:
+                for row in reader:
+                    try:
+                        # Extract and normalize data
+                        cnpj = normalize_cnpj(row.get("CNPJ_Companhia", ""))
+                        if not cnpj:
+                            errors += 1
+                            pbar.update(1)
+                            continue
+
+                        empresa = empresas_repo.get_by_cnpj(cnpj)
+                        empresa_id = empresa["id"]
+                        if not empresa_id:
+                            errors += 1
+                            pbar.update(1)
+                            continue
+
+                        mercado = row.get("Mercado", "").strip() or None
+                        if mercado != "Bolsa":
+                            ignored += 1
+                            pbar.update(1)
+                            continue
+
+                        valor_mobiliario = row.get("Valor_Mobiliario", "").strip() or None
+                        if valor_mobiliario != "Ações Ordinárias" and valor_mobiliario != "Ações Preferenciais" and valor_mobiliario != "Units":
+                            ignored += 1
+                            pbar.update(1)
+                            continue
+
+                        codigo_negociacao = validar_ticker_b3(row.get("Codigo_Negociacao", "").strip())
+                        if not codigo_negociacao:
+                            errors += 1
+                            pbar.update(1)
+                            continue
+
+                        nome = row.get("Nome_Empresarial", "").strip()
+                        classe = "Acao"
+                        controle_id = row.get("ID_Documento", "").strip() or None
+                        sigla_classe_acao = row.get("Sigla_Classe_Acao_Preferencial", "").strip() or None
+                        classe_acao = row.get("Classe_Acao_Preferencial", "").strip() or None
+                        composicao = row.get("Composicao_BDR_Unit", "").strip() or None
+                        data_inicio_negociacao = _parse_cvm_date(row.get("Data_Inicio_Negociacao", ""))
+                        data_fim_negociacao = _parse_cvm_date(row.get("Data_Fim_Negociacao", ""))
+                        segmento = row.get("Segmento", "").strip() or None
+                        importado = 1
+
+						# Set ativo based on situacao
+                        ativo = 1
+                        
+                        # Upsert company
+                        empresa_id, was_inserted = valor_mobiliario_repo.upsert_by_ticker(
+                            ticker=codigo_negociacao,
+                            nome=nome,
+                            classe=classe,
+                            empresa_id=empresa_id,
+                            controle_id = controle_id,
+                            valor_mobiliario=valor_mobiliario,
+                            sigla_classe_acao=sigla_classe_acao,
+                            classe_acao=classe_acao,
+                            composicao=composicao,
+                            mercado=mercado,
+                            data_inicio_negociacao=data_inicio_negociacao,
+                            data_fim_negociacao=data_fim_negociacao,
+                            segmento=segmento,
+                            importado=importado,
+                            ativo=ativo
+                        )
+
+                        if was_inserted == 1:
+                            inserted += 1
+                        elif was_inserted == 2:
+                            updated += 1
+                        else:
+                            ignored += 1
+
+                    except Exception as e:
+                        errors += 1
+                    
+                    pbar.update(1)
+        
+        return inserted, updated, ignored, errors
         
     finally:
         # Cleanup temp files

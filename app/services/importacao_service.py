@@ -15,6 +15,7 @@ from ..core.daterules import parse_year_month_from_sheet, last_business_day
 from ..core.utils import normalize_cnpj
 from ..db.repositories import ativos_repo, proventos_repo, fechamentos_repo, empresas_repo
 from ..db.repositories import movimentacao_repo , valor_mobiliario_repo
+from ..db.repositories import b3_posicao_consolidada_repo, corretoras_repo
 from ..db.repositories import users_repo  # só para garantir conexão se precisar
 
 class ValidationError(Exception): ...
@@ -732,3 +733,296 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
 		conn.close()
 	
 	return inseridas, atualizadas, ignoradas, erros
+
+# --------- B3 POSIÇÃO CONSOLIDADA ---------
+
+def find_b3_posicao_files(imports_dir: str = "imports") -> list[str]:
+	"""Encontra arquivos de posição consolidada da B3 na pasta imports"""
+	import calendar
+	
+	meses = [
+		'janeiro', 'fevereiro', 'marco', 'abril', 'maio', 'junho',
+		'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'
+	]
+	
+	pattern = os.path.join(imports_dir, "relatorio-consolidado-mensal-*.xlsx")
+	files = glob.glob(pattern)
+	
+	# Filtrar apenas arquivos com padrão válido
+	valid_files = []
+	for file in files:
+		basename = os.path.basename(file)
+		# Padrão: relatorio-consolidado-mensal-YYYY-{mes}.xlsx
+		match = re.match(r'^relatorio-consolidado-mensal-(\d{4})-(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\.xlsx$', basename.lower())
+		if match:
+			valid_files.append(file)
+	
+	# Ordenar por mtime (mais recente primeiro) e limitar a 10
+	valid_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+	return valid_files[:10]
+
+def _parse_data_referencia_from_filename(filename: str) -> str:
+	"""Extrai a data de referência do nome do arquivo"""
+	import calendar
+	from datetime import date
+	
+	meses_map = {
+		'janeiro': 1, 'fevereiro': 2, 'marco': 3, 'abril': 4,
+		'maio': 5, 'junho': 6, 'julho': 7, 'agosto': 8,
+		'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+	}
+	
+	basename = os.path.basename(filename).lower()
+	match = re.match(r'^relatorio-consolidado-mensal-(\d{4})-(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\.xlsx$', basename)
+	
+	if not match:
+		raise ValidationError(f"Nome de arquivo inválido: {filename}")
+	
+	ano = int(match.group(1))
+	mes_nome = match.group(2)
+	mes = meses_map[mes_nome]
+	
+	# Último dia do mês (fevereiro sempre 28 conforme requisito)
+	if mes == 2:
+		ultimo_dia = 28
+	else:
+		ultimo_dia = calendar.monthrange(ano, mes)[1]
+	
+	return f"{ano:04d}-{mes:02d}-{ultimo_dia:02d}"
+
+def _validate_b3_posicao_cadastros(rows: List[dict]) -> List[str]:
+	"""Valida se instituições, CNPJs e tickers existem nos cadastros"""
+	from ..db.connection import get_conn
+	
+	errors = []
+	
+	# Obter listas de cadastros existentes
+	conn = get_conn()
+	
+	# Corretoras (descricao)
+	corretoras_existentes = {
+		row['descricao'].strip().lower() for row in 
+		conn.execute("SELECT descricao FROM corretoras WHERE ativo=1 AND descricao IS NOT NULL").fetchall()
+	}
+	
+	# Empresas (CNPJ)
+	empresas_existentes = {
+		row['cnpj'].strip() for row in 
+		conn.execute("SELECT cnpj FROM empresas WHERE ativo=1").fetchall()
+	}
+	
+	# Ativos (ticker)
+	ativos_existentes = {
+		row['ticker'].strip().upper() for row in 
+		conn.execute("SELECT ticker FROM ativos WHERE ativo=1").fetchall()
+	}
+	
+	conn.close()
+	
+	# Verificar dados do arquivo
+	instituicoes_faltantes = set()
+	cnpjs_faltantes = set()
+	tickers_faltantes = set()
+	
+	for row in rows:
+		instituicao = row.get('instituicao', '').strip().lower()
+		cnpj = row.get('cnpj_empresa', '').strip()
+		ticker = row.get('codigo_negociacao', '').strip().upper()
+		
+		if instituicao and instituicao not in corretoras_existentes:
+			instituicoes_faltantes.add(row.get('instituicao', '').strip())
+		
+		if cnpj and cnpj not in empresas_existentes:
+			cnpjs_faltantes.add(cnpj)
+		
+		if ticker and ticker not in ativos_existentes:
+			tickers_faltantes.add(ticker)
+	
+	# Montar lista de erros
+	if instituicoes_faltantes:
+		errors.append(f"Instituições não cadastradas: {', '.join(sorted(instituicoes_faltantes))}")
+	
+	if cnpjs_faltantes:
+		errors.append(f"CNPJs não cadastrados: {', '.join(sorted(cnpjs_faltantes))}")
+	
+	if tickers_faltantes:
+		errors.append(f"Tickers não cadastrados: {', '.join(sorted(tickers_faltantes))}")
+	
+	return errors
+
+def _normalize_b3_decimal(value) -> str:
+	"""Normaliza valores decimais da B3 (vírgula para ponto, trata '-' como zero)"""
+	if not value or value == '-' or str(value).strip() == '':
+		return '0'
+	
+	str_value = str(value).strip()
+	
+	# Remove pontos de milhares e substitui vírgula decimal por ponto
+	# Ex: "1.500,25" -> "1500.25"
+	if ',' in str_value and '.' in str_value:
+		# Formato brasileiro: pontos para milhares, vírgula para decimal
+		str_value = str_value.replace('.', '').replace(',', '.')
+	elif ',' in str_value:
+		# Apenas vírgula decimal
+		str_value = str_value.replace(',', '.')
+	
+	try:
+		decimal_value = D(str_value)
+		return str(decimal_value)
+	except:
+		return '0'
+
+def preview_b3_posicao(path: str) -> List[dict]:
+	"""Gera preview dos dados de posição consolidada"""
+	# Verificar se a aba existe
+	sheets = list_sheets(path)
+	sheet_target = "Posição - Ações"
+	
+	if sheet_target not in sheets:
+		raise ValidationError(f"Aba '{sheet_target}' não encontrada. Abas disponíveis: {', '.join(sheets)}")
+	
+	rows = read_xlsx_rows(path, sheet_target)
+	data_referencia = _parse_data_referencia_from_filename(path)
+	
+	preview_data = []
+	for row in rows[:50]:  # Limitar preview a 50 linhas
+		# Ignorar linhas de totalização
+		valor_atualizado = str(row.get('Valor Atualizado', '')).strip()
+		if 'total' in valor_atualizado.lower():
+			continue
+		
+		preview_data.append({
+			'data_referencia': data_referencia,
+			'instituicao': str(row.get('Instituição', '')).strip(),
+			'conta': str(row.get('Conta', '')).strip(),
+			'cnpj_empresa': str(row.get('CNPJ da Empresa', '')).strip(),
+			'codigo_negociacao': str(row.get('Código de Negociação', '')).strip(),
+			'nome_ativo': str(row.get('Ativo', '')).strip(),
+			'quantidade_disponivel': _normalize_b3_decimal(row.get('Quantidade Disponível', 0)),
+			'quantidade_indisponivel': _normalize_b3_decimal(row.get('Quantidade Indisponível', 0)),
+			'valor_atualizado': _normalize_b3_decimal(row.get('Valor Atualizado', 0))
+		})
+	
+	return preview_data
+
+def importar_b3_posicao(path: str) -> Tuple[int, int, int]:
+	"""
+	Importa posição consolidada da B3
+	Returns (inseridas, removidas, erros)
+	"""
+	from ..db.connection import get_conn
+	
+	# Verificar se a aba existe
+	sheets = list_sheets(path)
+	sheet_target = "Posição - Ações"
+	
+	if sheet_target not in sheets:
+		raise ValidationError(f"Aba '{sheet_target}' não encontrada. Abas disponíveis: {', '.join(sheets)}")
+	
+	rows = read_xlsx_rows(path, sheet_target)
+	data_referencia = _parse_data_referencia_from_filename(path)
+	
+	# Mapear colunas esperadas
+	expected_columns = [
+		'Instituição', 'Conta', 'CNPJ da Empresa', 'Código de Negociação',
+		'Ativo', 'Quantidade Disponível', 'Quantidade Indisponível', 'Valor Atualizado'
+	]
+	
+	# Verificar cabeçalhos (primeira linha não vazia)
+	if not rows:
+		raise ValidationError("Arquivo não contém dados")
+	
+	first_row = rows[0] if rows else {}
+	missing_columns = [col for col in expected_columns if col not in first_row]
+	
+	if missing_columns:
+		raise ValidationError(f"Colunas faltantes: {', '.join(missing_columns)}")
+	
+	# Processar dados e filtrar linhas válidas
+	processed_data = []
+	for row in rows:
+		# Ignorar linhas de totalização
+		valor_atualizado = str(row.get('Valor Atualizado', '')).strip()
+		if 'total' in valor_atualizado.lower():
+			continue
+		
+		# Verificar se linha tem dados essenciais
+		codigo_negociacao = str(row.get('Código de Negociação', '')).strip()
+		if not codigo_negociacao:
+			continue
+		
+		processed_data.append({
+			'data_referencia': data_referencia,
+			'instituicao': str(row.get('Instituição', '')).strip(),
+			'conta': str(row.get('Conta', '')).strip(),
+			'cnpj_empresa': str(row.get('CNPJ da Empresa', '')).strip(),
+			'codigo_negociacao': codigo_negociacao.upper(),
+			'nome_ativo': str(row.get('Ativo', '')).strip(),
+			'quantidade_disponivel': _normalize_b3_decimal(row.get('Quantidade Disponível', 0)),
+			'quantidade_indisponivel': _normalize_b3_decimal(row.get('Quantidade Indisponível', 0)),
+			'valor_atualizado': _normalize_b3_decimal(row.get('Valor Atualizado', 0))
+		})
+	
+	if not processed_data:
+		raise ValidationError("Nenhuma linha válida encontrada para importação")
+	
+	# Validações bloqueantes
+	validation_errors = _validate_b3_posicao_cadastros(processed_data)
+	if validation_errors:
+		raise ValidationError("\n".join(validation_errors))
+	
+	# Verificar duplicidade por competência
+	removidas = 0
+	if b3_posicao_consolidada_repo.exists_by_competencia(data_referencia):
+		removidas = b3_posicao_consolidada_repo.delete_by_competencia(data_referencia)
+	
+	# Importação transacional com progresso
+	conn = get_conn()
+	inseridas = 0
+	erros = 0
+	
+	try:
+		conn.execute("BEGIN;")
+		
+		# Barra de progresso
+		for row_data in tqdm(processed_data, desc="Importando posições"):
+			try:
+				b3_posicao_consolidada_repo.create(row_data)
+				inseridas += 1
+			except Exception as e:
+				erros += 1
+				print(f"Erro ao processar linha: {e}")
+				continue
+		
+		conn.execute("COMMIT;")
+		
+	except Exception as e:
+		conn.execute("ROLLBACK;")
+		raise ValidationError(f"Erro na importação: {e}")
+	finally:
+		conn.close()
+	
+	# Mover arquivo para processed
+	_move_to_processed(path)
+	
+	return inseridas, removidas, erros
+
+def _move_to_processed(file_path: str):
+	"""Move arquivo processado para imports/processed"""
+	import shutil
+	
+	processed_dir = os.path.join(os.path.dirname(file_path), "processed")
+	os.makedirs(processed_dir, exist_ok=True)
+	
+	filename = os.path.basename(file_path)
+	destination = os.path.join(processed_dir, filename)
+	
+	# Resolver colisão de nome se necessário
+	if os.path.exists(destination):
+		from datetime import datetime
+		timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+		name, ext = os.path.splitext(filename)
+		filename = f"{name}_{timestamp}{ext}"
+		destination = os.path.join(processed_dir, filename)
+	
+	shutil.move(file_path, destination)

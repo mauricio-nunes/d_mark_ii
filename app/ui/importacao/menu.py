@@ -9,6 +9,7 @@ from ...services.importacao_service import (
     preview_fechamentos, importar_fechamentos,
     import_cvm_companies, import_cvm_valores_mobiliarios,
     find_movimentacao_files, preview_movimentacao, importar_movimentacao,
+    find_b3_posicao_files, preview_b3_posicao, importar_b3_posicao,
     CFG_PROV_MAP, CFG_FECH_MAP, ValidationError
 )
 from ...core.xlsx import list_sheets
@@ -274,6 +275,109 @@ def importar_movimentacao_b3_flow():
 	
 	pause()
 
+def importar_b3_posicao_flow():
+	clear_screen(); title("Importar [B3] Posição Consolidada")
+	
+	# Encontrar arquivos na pasta imports
+	files = find_b3_posicao_files()
+	
+	if not files:
+		print("Nenhum arquivo de posição consolidada encontrado na pasta 'imports'.")
+		print("Procure por arquivos no padrão: relatorio-consolidado-mensal-AAAA-{mes}.xlsx")
+		pause()
+		return
+	
+	# Se múltiplos arquivos, deixar usuário escolher
+	if len(files) == 1:
+		selected_file = files[0]
+		print(f"Arquivo encontrado: {os.path.basename(selected_file)}")
+	else:
+		print("Arquivos encontrados (até 10, ordenados por data de modificação):")
+		for i, file in enumerate(files, 1):
+			mtime = os.path.getmtime(file)
+			import datetime
+			mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%d/%m/%Y %H:%M")
+			print(f"{i}. {os.path.basename(file)} ({mtime_str})")
+		
+		try:
+			choice = int(_input("Escolha o arquivo (número): ").strip())
+			if 1 <= choice <= len(files):
+				selected_file = files[choice - 1]
+			else:
+				print("Opção inválida.")
+				pause()
+				return
+		except ValueError:
+			print("Entrada inválida.")
+			pause()
+			return
+	
+	print(f"\nProcessando arquivo: {os.path.basename(selected_file)}")
+	
+	try:
+		# Preview dos dados
+		preview_data = preview_b3_posicao(selected_file)
+		
+		if not preview_data:
+			print("Arquivo não contém dados válidos para importação.")
+			pause()
+			return
+		
+		print(f"\nPreview das primeiras linhas:")
+		print("-" * 100)
+		for i, row in enumerate(preview_data[:5], 1):
+			print(f"Linha {i}:")
+			print(f"  Data Ref: {row.get('data_referencia', 'N/A')}")
+			print(f"  Instituição: {row.get('instituicao', 'N/A')}")
+			print(f"  Conta: {row.get('conta', 'N/A')}")
+			print(f"  Ticker: {row.get('codigo_negociacao', 'N/A')}")
+			print(f"  Ativo: {row.get('nome_ativo', 'N/A')}")
+			print(f"  Qtd Disponível: {row.get('quantidade_disponivel', 'N/A')}")
+			print(f"  Valor Atualizado: {row.get('valor_atualizado', 'N/A')}")
+			print()
+		
+		if len(preview_data) > 5:
+			print(f"... e mais {len(preview_data) - 5} linhas")
+		
+		print("-" * 100)
+		
+		# Verificar se já existe dados para esta competência
+		from ...db.repositories.b3_posicao_consolidada_repo import exists_by_competencia
+		data_ref = preview_data[0]['data_referencia']
+		
+		if exists_by_competencia(data_ref):
+			competencia = data_ref[:7]  # YYYY-MM
+			print(f"\n⚠️  Já existem dados para a competência {competencia}.")
+			if not confirm("Sobrescrever dados existentes? (S/N) "):
+				print("Importação cancelada.")
+				pause()
+				return
+		
+		# Confirmar importação
+		if confirm("Confirmar importação? (S/N) "):
+			inseridas, removidas, erros = importar_b3_posicao(selected_file)
+			
+			# Relatório final
+			clear_screen(); title("Importação de Posição Consolidada Concluída")
+			print(f"Arquivo: {os.path.basename(selected_file)}")
+			print(f"Linhas inseridas: {inseridas}")
+			if removidas > 0:
+				print(f"Linhas removidas (sobrescrita): {removidas}")
+			print(f"Erros: {erros}")
+			print(f"Total processado: {inseridas + erros}")
+			
+			if erros > 0:
+				print(f"\n⚠️  {erros} linhas com erro foram ignoradas.")
+			
+			print(f"\n✅ Arquivo movido para 'imports/processed'")
+		
+	except ValidationError as e:
+		print(f"Erro: {e}")
+	except Exception as e:
+		print(f"Erro inesperado: {e}")
+	
+	pause()
+
 def importacao_loop():
     while True:
         clear_screen(); title("Importação")
@@ -281,14 +385,16 @@ def importacao_loop():
         print("2. Fechamento Mensal (XLSX)")
         print("3. [CVM] Cadastro Empresas")
         print("4. [CVM] Valores Mobiliários")
-        print("5. Importar Movimentação da B3")
-        print("6. Configurar Mapeamento de Colunas")
-        print("7. Voltar")
+        print("5. [B3] Posição consolidada")
+        print("6. Importar Movimentação da B3")
+        print("7. Configurar Mapeamento de Colunas")
+        print("8. Voltar")
         ch = _input("> ").strip()
         if ch == "1": importar_proventos_flow()
         elif ch == "2": importar_fechamentos_flow()
         elif ch == "3": importar_empresas_cvm_flow()
         elif ch == "4": importar_valores_mobiliarios_flow()
-        elif ch == "5": importar_movimentacao_b3_flow()
-        elif ch == "6": configurar_mapeamento_flow()
+        elif ch == "5": importar_b3_posicao_flow()
+        elif ch == "6": importar_movimentacao_b3_flow()
+        elif ch == "7": configurar_mapeamento_flow()
         else: break

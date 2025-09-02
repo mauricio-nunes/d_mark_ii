@@ -97,21 +97,21 @@ CREATE INDEX IF NOT EXISTS idx_transacoes_carteira ON transacoes(carteira_id);
 
 CREATE TABLE IF NOT EXISTS proventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  data_referencia TEXT NOT NULL,  -- YYYY-MM-DD (último dia do mês)
   ticker INTEGER NOT NULL,
   descricao TEXT,
   data_pagamento TEXT NOT NULL, -- ISO date
   tipo_evento TEXT NOT NULL, -- DIVIDENDO|JCP|RENDIMENTO FII|AMORTIZACAO|OUTROS
-  corretora_id INTEGER,
+  instituicao TEXT NOT NULL,
   quantidade TEXT,       -- opcional
   preco_unitario TEXT,   -- opcional
   valor_total TEXT,      -- opcional
   observacoes TEXT,
-  ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (ticker) REFERENCES ativos(id),
-  FOREIGN KEY (corretora_id) REFERENCES corretoras(id)
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+
 
 CREATE INDEX IF NOT EXISTS idx_proventos_ticker_data ON proventos(ticker, data_pagamento);
 

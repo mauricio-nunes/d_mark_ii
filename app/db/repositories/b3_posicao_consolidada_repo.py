@@ -7,16 +7,15 @@ def create(data: dict) -> int:
 	cur = conn.cursor()
 	cur.execute('''
 		INSERT INTO b3_posicao_consolidada(
-			data_referencia, instituicao, conta, cnpj_empresa, codigo_negociacao,
-			nome_ativo, quantidade_disponivel, quantidade_indisponivel,
-			valor_atualizado, preco_unitario, percentual_carteira, observacoes
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			data_referencia, produto, instituicao, conta, codigo_negociacao,cnpj_empresa,codigo_isin,tipo_indexador,adm_escriturador_emissor,quantidade,
+			quantidade_disponivel, quantidade_indisponivel, motivo, preco_fechamento,data_vencimento, valor_aplicado, valor_liquido, valor_atualizado, tipo_ativo,tipo_regime,data_emissao,contraparte
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	''', (
-		data['data_referencia'], data['instituicao'], data['conta'],
-		data['cnpj_empresa'], data['codigo_negociacao'], data['nome_ativo'],
-		data['quantidade_disponivel'], data['quantidade_indisponivel'],
-		data['valor_atualizado'], data.get('preco_unitario'),
-		data.get('percentual_carteira'), data.get('observacoes', '')
+		data['data_referencia'],data['produto'], data['instituicao'], data['conta'],
+		 data['codigo_negociacao'],data['cnpj_empresa'],data['codigo_isin'],data['tipo_indexador'],data['adm_escriturador_emissor'],data['quantidade'],
+		data['quantidade_disponivel'], data['quantidade_indisponivel'],data['motivo'],data['preco_fechamento'],data['data_vencimento'], data['valor_aplicado'],
+		data['valor_liquido'], data['valor_atualizado'], data['tipo_ativo'], data['tipo_regime'],
+		data['data_emissao'], data['contraparte']
 	))
 	conn.commit()
 	new_id = cur.lastrowid

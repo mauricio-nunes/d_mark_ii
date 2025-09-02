@@ -1,5 +1,7 @@
 from typing import Iterable, List, Dict, Any
 from openpyxl import load_workbook
+import warnings
+warnings.simplefilter("ignore", UserWarning)  # Suppress openpyxl warnings about data
 
 def read_xlsx_rows(path: str, sheet_name: str | None = None) -> List[Dict[str, Any]]:
     wb = load_workbook(filename=path, data_only=True)

@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS b3_posicao_consolidada (
 
 -- Índice único para evitar duplicações por competência/conta/ticker
 CREATE UNIQUE INDEX IF NOT EXISTS idx_b3_posicao_unique 
-	ON b3_posicao_consolidada(data_referencia, instituicao, codigo_negociacao);
+	ON b3_posicao_consolidada(data_referencia, instituicao, codigo_isin);
 
 -- Índices para consultas comuns
 CREATE INDEX IF NOT EXISTS idx_b3_posicao_data ON b3_posicao_consolidada(data_referencia);

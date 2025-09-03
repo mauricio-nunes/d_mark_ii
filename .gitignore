@@ -165,4 +165,5 @@ cython_debug/
 data/
 
 # Processed import files
+imports/
 imports/processed/

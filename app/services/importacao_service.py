@@ -10,15 +10,13 @@ import glob
 from datetime import datetime
 from tqdm import tqdm
 
-from app.ui.cadastros import ativos
+from ..db.connection import get_conn
 from ..core.xlsx import read_xlsx_rows, list_sheets
 from ..core.decimal_ctx import D, money, qty
-from ..core.daterules import parse_year_month_from_sheet, last_business_day
 from ..core.utils import normalize_cnpj
-from ..db.repositories import ativos_repo, proventos_repo, empresas_repo
+from ..db.repositories import proventos_repo, empresas_repo
 from ..db.repositories import movimentacao_repo , valor_mobiliario_repo
-from ..db.repositories import b3_posicao_consolidada_repo, corretoras_repo
-from ..db.repositories import users_repo  # só para garantir conexão se precisar
+from ..db.repositories import b3_posicao_consolidada_repo
 
 class ValidationError(Exception): ...
 
@@ -40,25 +38,6 @@ def validar_ticker_b3(ticker: str) -> bool:
     return False
 
 # --------- CVM IMPORT ---------
-
-def _parse_cvm_date(date_str: str) -> str | None:
-    """Parse CVM date format to ISO date (YYYY-MM-DD) or return None if invalid."""
-    if not date_str or date_str.strip() == "":
-        return None
-    
-    try:
-        # Try DD/MM/YYYY format first (common in Brazilian data)
-        if "/" in date_str:
-            day, month, year = date_str.strip().split("/")
-            return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
-        # Try YYYY-MM-DD format
-        elif "-" in date_str and len(date_str.split("-")[0]) == 4:
-            return date_str.strip()
-        else:
-            return None
-    except:
-        return None
-
 def download_cvm_file(year: int) -> str:
     """
     Download CVM file for the given year and return path to extracted CSV.
@@ -101,6 +80,24 @@ def download_cvm_file(year: int) -> str:
         raise Exception("Arquivo ZIP corrompido")
     except Exception as e:
         raise Exception(f"Erro no processamento: {e}")
+
+def _parse_cvm_date(date_str: str) -> str | None:
+    """Parse CVM date format to ISO date (YYYY-MM-DD) or return None if invalid."""
+    if not date_str or date_str.strip() == "":
+        return None
+    
+    try:
+        # Try DD/MM/YYYY format first (common in Brazilian data)
+        if "/" in date_str:
+            day, month, year = date_str.strip().split("/")
+            return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        # Try YYYY-MM-DD format
+        elif "-" in date_str and len(date_str.split("-")[0]) == 4:
+            return date_str.strip()
+        else:
+            return None
+    except:
+        return None
 
 def download_cvm_valor_mobiliario_file(year: int) -> str:
     """
@@ -738,6 +735,12 @@ def read_b3_posicao_file(path: str, sheet_target: str) -> List[dict]:
         expected_columns = [
 			'Instituição', 'Produto', 'Quantidade Disponível', 'Quantidade Indisponível', 'Valor Atualizado', 
    			'Valor líquido', 'Valor Aplicado', 'Valor bruto'	]
+    
+    if sheet_target =='Posição - Renda Fixa':
+        expected_columns = ['Produto', 'Instituição', 'Emissor', 'Código', 'Indexador', 'Tipo de regime', 'Data de Emissão', 
+                            'Vencimento', 'Quantidade', 'Quantidade Disponível', 'Quantidade Indisponível', 'Motivo', 
+                            'Contraparte', 'Preço Atualizado MTM', 'Valor Atualizado MTM', 'Preço Atualizado CURVA', 'Valor Atualizado CURVA']
+
         
     if sheet_target == "Proventos Recebidos":
         expected_columns = [ 'Produto','Pagamento','Tipo de Evento','Instituição','Quantidade','Preço unitário','Valor líquido']
@@ -756,165 +759,129 @@ def read_b3_posicao_file(path: str, sheet_target: str) -> List[dict]:
     
     return rows
         
-def importar_b3_posicao(path: str, data_ref:str, sheet_names: list) -> Tuple[int, int, int]:
+def importar_b3_posicao(path: str, data_ref: str, sheet_names: list) -> Tuple[int, int, int]:
     """
-    Importa posição consolidada da B3
+    Importa posição consolidada da B3.
     Returns (inseridas, removidas, erros)
     """
-    
     processed_data = []
+    processed_data_proventos = []
+
+    # Process sheets and collect data
     for sheet in sheet_names:
         if sheet in ["Posição - Ações", "Posição - Fundos", "Posição - Tesouro Direto", "Posição - Renda Fixa"]:
-           
             rows = read_b3_posicao_file(path, sheet)
-            
             tipo_ativo = sheet.split('-')[1].strip().lower()
             for row in rows:
-                
                 produto = str(row.get('Produto', '')).strip()
-                if produto =='' or produto == 'None':
+                if not produto or produto == 'None':
                     continue
 
-                
-                codigo_negociacao = str(row.get('Código de Negociação', '')).strip()
-                codigo_isin = str(row.get('Código ISIN / Distribuição', '')).strip()
-                tipo_indexador = str(row.get('Tipo', '')).strip()
-                adm_escriturador_emissor = str(row.get('Escriturador', ''))
-                cnpj_empresa = str(row.get('CNPJ da Empresa', '')).strip()
-                instituicao = str(row.get('Instituição', '')).strip()
-                conta = str(row.get('Conta', '')).strip()
-                codigo_isin = str(row.get('Código ISIN / Distribuição', '')).strip()
-                tipo_indexador = str(row.get('Tipo', '')).strip()
-                quantidade = _normalize_b3_decimal(row.get('Quantidade', 0))
-                quantidade_disponivel = _normalize_b3_decimal(row.get('Quantidade Disponível', 0))
-                quantidade_indisponivel = _normalize_b3_decimal(row.get('Quantidade Indisponível', 0))
-                motivo = str(row.get('Motivo', '')).strip()
-                preco_fechamento =  _normalize_b3_decimal(row.get('Preço de Fechamento', 0))
-                valor_atualizado = _normalize_b3_decimal(row.get('Valor Atualizado', 0))
-                vencimento =  _parse_date(row.get('Vencimento', '').strip())
-                valor_aplicado = _normalize_b3_decimal(row.get('Valor Aplicado', 0))
-                valor_liquido = _normalize_b3_decimal(row.get('Valor líquido', 0))
-                tipo_regime = str(row.get('Tipo de Regime', '')).strip()
-                data_emissao =  _parse_date(row.get('Data de Emissão', '').strip())
-                contraparte = str(row.get('Contraparte', '')).strip()
-                preco_atualizado_mtm = _normalize_b3_decimal(row.get('Preço Atualizado MTM', 0))
-                valor_atualizado_mtm = _normalize_b3_decimal(row.get('Valor Atualizado MTM', 0))
+                # Extract and normalize fields
+                data = {
+                    'data_referencia': data_ref,
+                    'produto': produto,
+                    'instituicao': str(row.get('Instituição', '')).strip(),
+                    'conta': str(row.get('Conta', '')).strip(),
+                    'codigo_negociacao': str(row.get('Código de Negociação', '')).strip(),
+                    'cnpj_empresa': str(row.get('CNPJ da Empresa', '')).strip(),
+                    'codigo_isin': str(row.get('Código ISIN / Distribuição', '')).strip(),
+                    'tipo_indexador': str(row.get('Tipo', '')).strip(),
+                    'adm_escriturador_emissor': str(row.get('Escriturador', '')),
+                    'quantidade': _normalize_b3_decimal(row.get('Quantidade', 0)),
+                    'quantidade_disponivel': _normalize_b3_decimal(row.get('Quantidade Disponível', 0)),
+                    'quantidade_indisponivel': _normalize_b3_decimal(row.get('Quantidade Indisponível', 0)),
+                    'motivo': str(row.get('Motivo', '')).strip(),
+                    'preco_fechamento': _normalize_b3_decimal(row.get('Preço de Fechamento', 0)),
+                    'data_vencimento': _parse_date(row.get('Vencimento', '').strip()),
+                    'valor_aplicado': _normalize_b3_decimal(row.get('Valor Aplicado', 0)),
+                    'valor_liquido': _normalize_b3_decimal(row.get('Valor líquido', 0)),
+                    'valor_atualizado': _normalize_b3_decimal(row.get('Valor Atualizado', 0)),
+                    'tipo_ativo': tipo_ativo,
+                    'tipo_regime': str(row.get('Tipo de Regime', '')).strip(),
+                    'data_emissao': _parse_date(row.get('Data de Emissão', '').strip()),
+                    'contraparte': str(row.get('Contraparte', '')).strip(),
+                    'preco_atualizado_mtm': _normalize_b3_decimal(row.get('Preço Atualizado MTM', 0)),
+                    'valor_atualizado_mtm': _normalize_b3_decimal(row.get('Valor Atualizado MTM', 0)),
+                }
 
-
-
+                # Adjust fields for specific types
                 if tipo_ativo == 'fundos':
-                    adm_escriturador_emissor = str(row.get('Administrador', ''))
-                    cnpj_empresa = str(row.get('CNPJ do Fundo', '')).strip()
+                    data['adm_escriturador_emissor'] = str(row.get('Administrador', ''))
+                    data['cnpj_empresa'] = str(row.get('CNPJ do Fundo', '')).strip()
+                elif tipo_ativo == 'tesouro direto':
+                    data['codigo_negociacao'] = produto.replace("Tesouro", "")
+                    data['codigo_isin'] = str(row.get('Código ISIN', '')).strip()
+                    data['tipo_indexador'] = str(row.get('Indexador', ''))
+                elif tipo_ativo == 'renda fixa':
+                    data['codigo_negociacao'] = produto.split()[0]
+                    data['codigo_isin'] = str(row.get('Código', '')).strip()
+                    data['tipo_indexador'] = str(row.get('Indexador', ''))
+                    data['adm_escriturador_emissor'] = str(row.get('Emissor', ''))
+                    data['preco_fechamento'] = _normalize_b3_decimal(row.get('Preço Atualizado CURVA', 0))
+                    data['valor_atualizado'] = row.get('Valor Atualizado CURVA', 0)
 
+                processed_data.append(data)
 
-                if tipo_ativo == 'tesouro direto':
-                    codigo_negociacao = produto.replace("Tesouro", "")
-                    codigo_isin = str(row.get('Código ISIN', '')).strip()
-                    tipo_indexador = str(row.get('Indexador', ''))
-
-
-
-                if tipo_ativo == 'renda fixa':
-                    codigo_negociacao = produto.split()[0]
-                    codigo_isin = str(row.get('Código', '')).strip()
-                    tipo_indexador = str(row.get('Indexador', ''))
-                    adm_escriturador_emissor = str(row.get('Emissor', ''))
-                    preco_fechamento = _normalize_b3_decimal(row.get('Preço Atualizado CURVA', 0))
-                    valor_atualizado =  row.get('Valor Atualizado CURVA', 0)
-
-                processed_data.append({
-                        'data_referencia': data_ref,
-                        'produto' : produto,
-                        'instituicao': instituicao,
-                        'conta': conta,
-                        'codigo_negociacao': codigo_negociacao,
-                        'cnpj_empresa': cnpj_empresa,
-                        'codigo_isin': codigo_isin,
-                        'tipo_indexador' : tipo_indexador,
-                        'adm_escriturador_emissor' : adm_escriturador_emissor,
-                        'quantidade' : quantidade,
-                        'quantidade_disponivel': quantidade_disponivel,
-                        'quantidade_indisponivel': quantidade_indisponivel,
-                        'motivo' : motivo,
-                        'preco_fechamento' : preco_fechamento,
-                        'data_vencimento' : vencimento,
-                        'valor_aplicado': valor_aplicado,
-                        'valor_liquido': valor_liquido,
-                        'valor_atualizado': valor_atualizado,
-                        'tipo_ativo': tipo_ativo,
-                        'tipo_regime': tipo_regime,
-                        'data_emissao': data_emissao,
-                        'contraparte': contraparte,
-                        'preco_atualizado_mtm': preco_atualizado_mtm,
-                        'valor_atualizado_mtm': valor_atualizado_mtm
-                    })
-                
-        if sheet in ["Proventos Recebidos"]:
-            processed_data_proventos = []
-            rows = read_b3_posicao_file(path, "Proventos Recebidos")
+        elif sheet == "Proventos Recebidos":
+            rows = read_b3_posicao_file(path, sheet)
             for row in rows:
-                
                 produto = str(row.get('Produto', '')).strip()
-                if produto =='' or produto == 'None':
+                if not produto or produto == 'None':
                     continue
-            
                 processed_data_proventos.append({
                     'data_referencia': data_ref,
-                    'ticker' : str(row.get('Produto', '')).split('-')[0].strip().upper(),
-                    'descricao': str(row.get('Produto', '')).strip(),
+                    'ticker': produto.split('-')[0].strip().upper(),
+                    'descricao': produto,
                     'data_pagamento': _parse_date(str(row.get('Pagamento', '')).strip()),
                     'tipo_evento': str(row.get('Tipo de Evento', '')).strip(),
                     'instituicao': str(row.get('Instituição', '')).strip(),
                     'quantidade': str(row.get('Quantidade', 0)).replace('.', ''),
-                    'preco_unitario': _normalize_b3_decimal(row.get('Valor Atualizado', 0)),
+                    'preco_unitario': _normalize_b3_decimal(row.get('Preço unitário', 0)),
                     'valor_total': _normalize_b3_decimal(row.get('Valor líquido', 0)),
-                    'observacoes' : str(row.get('Observações', '')).strip()
+                    'observacoes': str(row.get('Observações', '')).strip()
                 })
-            
-            
-            
-    from ..db.connection import get_conn
+
+
     conn = get_conn()
-    
+    inseridas = 0
+    erros = 0
+    removidas_posicao = 0
+    removidas_proventos = 0
+
     try:
-        inseridas = 0
-        erros = 0
-        conn.execute("BEGIN;")
-        
-        removidas_posicao = 0
-        removidas_posicao = b3_posicao_consolidada_repo.delete_by_competencia(data_ref)
-        removidas_proventos = 0
-        removidas_proventos = proventos_repo.delete_by_competencia(data_ref)
-        
-        # Barra de progresso
+        conn.execute("BEGIN TRANSACTION;")
+        # Remove old data for the same competencia
+        removidas_posicao = b3_posicao_consolidada_repo.delete_by_competencia(data_ref , conn=conn)
+        removidas_proventos = proventos_repo.delete_by_competencia(data_ref, conn=conn)
+
+        # Insert new consolidated positions
         for row_data in tqdm(processed_data, desc="Importando posições"):
             try:
-                b3_posicao_consolidada_repo.create(row_data)
+                b3_posicao_consolidada_repo.create(row_data,conn=conn)
                 inseridas += 1
             except Exception as e:
                 erros += 1
                 print(f"Erro ao processar linha: {e}")
-                continue
-        
-       
-        # Barra de progresso dos Proventos
+
+        # Insert new proventos
         for row_data in tqdm(processed_data_proventos, desc="Importando Proventos"):
             try:
-                proventos_repo.create(row_data)
+                proventos_repo.create(row_data,conn=conn)
                 inseridas += 1
             except Exception as e:
                 erros += 1
                 print(f"Erro ao processar linha: {e}")
-                continue
-        
-        conn.execute("COMMIT;")
-        
+
+        conn.commit()
     except Exception as e:
-        conn.execute("ROLLBACK;")
+        conn.rollback()
         raise ValidationError(f"Erro na importação: {e}")
     finally:
+        # Mover arquivo para processed
+        _move_to_processed(path)
         conn.close()
-    
+
     return inseridas, removidas_posicao + removidas_proventos, erros
 
 def _move_to_processed(file_path: str):

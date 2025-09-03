@@ -1,9 +1,15 @@
-from typing import List, Optional, Tuple
+from typing import List
 from ..connection import get_conn
 
-def create(data: dict) -> int:
+def create(data: dict, conn=None) -> int:
 	"""Cria novo registro de posição consolidada"""
-	conn = get_conn()
+
+	if conn is None:
+		conn = get_conn()
+		should_close = True
+	else:
+		should_close = False
+  
 	cur = conn.cursor()
 	cur.execute('''
 		INSERT INTO b3_posicao_consolidada(
@@ -17,14 +23,25 @@ def create(data: dict) -> int:
 		data['valor_liquido'], data['valor_atualizado'], data['tipo_ativo'], data['tipo_regime'],
 		data['data_emissao'], data['contraparte']
 	))
-	conn.commit()
-	new_id = cur.lastrowid
-	conn.close()
+ 
+	if should_close:
+		conn.commit()
+		new_id = cur.lastrowid
+		conn.close()
+	else:
+		new_id = cur.lastrowid
+
 	return new_id
 
-def delete_by_competencia(data_referencia: str) -> int:
+def delete_by_competencia(data_referencia: str, conn = None) -> int:
 	"""Remove todos os registros de uma competência (mês/ano)"""
-	conn = get_conn()
+
+	if conn is None:
+		conn = get_conn()
+		should_close = True
+	else:
+		should_close = False
+  
 	# Extrair ano-mês da data_referencia (YYYY-MM-DD -> YYYY-MM)
 	ano_mes = data_referencia[:7]  # YYYY-MM
 	
@@ -39,8 +56,12 @@ def delete_by_competencia(data_referencia: str) -> int:
 		"DELETE FROM b3_posicao_consolidada WHERE substr(data_referencia, 1, 7) = ?",
 		(ano_mes,)
 	)
-	conn.commit()
-	conn.close()
+ 
+	if should_close:
+		conn.commit()
+		conn.close()
+	
+ 
 	return count
 
 def exists_by_competencia(data_referencia: str) -> bool:

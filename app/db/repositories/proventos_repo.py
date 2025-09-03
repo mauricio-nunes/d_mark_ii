@@ -1,8 +1,14 @@
-from typing import List, Optional
 from ..connection import get_conn
 
-def create(data: dict) -> int:
-    conn = get_conn(); cur = conn.cursor()
+def create(data: dict, conn=None) -> int:
+    
+    if conn is None:
+        conn = get_conn()
+        should_close = True
+    else:
+        should_close = False
+
+    cur = conn.cursor()
     cur.execute("""
         INSERT INTO proventos(data_referencia, ticker, descricao, data_pagamento, tipo_evento,
                               instituicao, quantidade, preco_unitario, valor_total,
@@ -12,12 +18,25 @@ def create(data: dict) -> int:
           data["tipo_evento"], data.get("instituicao"),
           data.get("quantidade"), data.get("preco_unitario"),
           data.get("valor_total"), data.get("observacoes")))
-    conn.commit(); nid = cur.lastrowid; conn.close(); return nid
+    
+    if should_close:
+        conn.commit();
+        nid = cur.lastrowid;
+        conn.close();
+    else : 
+        nid = cur.lastrowid;
+
+    return nid
     
 
-def delete_by_competencia(data_referencia: str) -> int:
+def delete_by_competencia(data_referencia: str, conn=None) -> int:
 	"""Remove todos os registros de uma competência (mês/ano)"""
-	conn = get_conn()
+	if conn is None:
+		conn = get_conn()
+		should_close = True
+	else:
+		should_close = False
+
 	# Extrair ano-mês da data_referencia (YYYY-MM-DD -> YYYY-MM)
 	ano_mes = data_referencia[:7]  # YYYY-MM
 	
@@ -32,8 +51,10 @@ def delete_by_competencia(data_referencia: str) -> int:
 		"DELETE FROM proventos WHERE substr(data_referencia, 1, 7) = ?",
 		(ano_mes,)
 	)
-	conn.commit()
-	conn.close()
+ 
+	if should_close:
+		conn.commit()
+		conn.close()
 	return count
 
 def exists_by_competencia(data_referencia: str) -> bool:

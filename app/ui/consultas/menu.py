@@ -3,6 +3,7 @@ from ..widgets import title, divider, pause
 from ..prompts import prompt_menu_choice
 from ...core.utils import clear_screen
 from .posicao import tela_posicao
+from .posicao_simples import tela_posicao_simples
 from .extrato import tela_extrato
 from .proventos import tela_proventos
 from .historico import tela_historico
@@ -10,6 +11,7 @@ from .pm_detalhado import tela_pm_detalhado
 
 ITEMS = [
     "Posição por Carteira",
+    "Posição",
     "Extrato de Transações",
     "Proventos por Período",
     "Histórico Mensal",
@@ -26,9 +28,10 @@ def consultas_loop():
         ch = prompt_menu_choice("Selecione: ").strip().lower()
         match ch:
             case "1": tela_posicao()
-            case "2": tela_extrato()
-            case "3": tela_proventos()
-            case "4": tela_historico()
-            case "5": tela_pm_detalhado()
-            case "6" | "q" | "voltar": keep = False
+            case "2": tela_posicao_simples()
+            case "3": tela_extrato()
+            case "4": tela_proventos()
+            case "5": tela_historico()
+            case "6": tela_pm_detalhado()
+            case "7" | "q" | "voltar": keep = False
             case _: print("Opção inválida."); pause()

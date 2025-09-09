@@ -113,6 +113,62 @@ def posicao_por_carteira(carteira_id: int, data_ref: Optional[str]) -> List[Dict
     out.sort(key=lambda r: r["ticker"])
     return out
 
+def posicao_simples(carteira_id: int, data_ref: Optional[str]) -> List[Dict]:
+    """
+    Retorna relatório simplificado de posição com apenas 4 colunas:
+    - codigo_negociacao (string já mapeada por data_ref)
+    - quantidade_atual (Decimal com 6 decimais)
+    - valor_investido (Decimal = quantidade × preço médio)
+    - preco_medio (Decimal com 3 decimais na exibição)
+    
+    Exibe apenas ativos com quantidade > 0, ordenados por código de negociação.
+    """
+    # descobrir tickers com transações na carteira até a data_ref
+    txs = transacoes_repo.list(texto="", ticker_id=None, carteira_id=carteira_id, data_ini=None, data_fim=data_ref,
+                               offset=0, limit=1_000_000, apenas_ativas=True)
+    tickers = sorted(set(t["ticker"] for t in txs))
+    out: List[Dict] = []
+
+    # helper local para display do ticker (mesma lógica da função existente)
+    def ticker_display_at(ticker_id: int, ref_date: Optional[str]) -> str:
+        atv = ativos_repo.get_by_id(ticker_id)
+        if not atv:
+            return f"#{ticker_id}"
+        disp = atv["ticker"]
+        if not ref_date:
+            return disp
+        maps = ticker_mapping_repo.list(0, 1000)
+        chosen = None
+        for m in maps:
+            if m["ticker_antigo"] == ticker_id and m["data_vigencia"] <= ref_date:
+                chosen = m
+        if chosen:
+            atv2 = ativos_repo.get_by_id(chosen["ticker_novo"])
+            if atv2:
+                disp = atv2["ticker"]
+        return disp
+
+    for tid in tickers:
+        q_str, pm_str = posicao_ajustada_on_the_fly(tid, carteira_id, data_ref)
+        q = qty(q_str)
+        if q <= 0:
+            continue
+        pm = money(pm_str)
+        
+        # Valor investido = quantidade atual × preço médio atual
+        valor_investido = q * pm
+
+        out.append({
+            "codigo_negociacao": ticker_display_at(tid, data_ref),
+            "quantidade_atual": q,           # Decimal com 6 decimais
+            "valor_investido": valor_investido,  # Decimal
+            "preco_medio": pm                # Decimal, será exibido com 3 decimais
+        })
+
+    # ordenar por código de negociação
+    out.sort(key=lambda r: r["codigo_negociacao"])
+    return out
+
 # ---------- 5.2 Extrato (com quantidade ajustada na data_ref) ----------
 
 def extrato(carteira_id: int | None, ticker_id: int | None,

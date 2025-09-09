@@ -13,6 +13,14 @@ def fmt_qty(v: Decimal | None) -> str:
         return "N/D"
     return f"{v:,.6f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+def fmt_price(v: Decimal | None) -> str:
+    """Formato para preço médio com 3 casas decimais."""
+    if v is None:
+        return "N/D"
+    s = f"{v:,.3f}"
+    # converte 12,345.678 -> 12.345,678
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
 def fmt_pct(v: Decimal | None) -> str:
     if v is None:
         return "N/D"

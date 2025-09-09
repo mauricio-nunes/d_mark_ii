@@ -256,20 +256,20 @@ def importar_movimentacao_b3_flow():
             pause()
             return
 
-        print(f"\nPreview das primeiras linhas:")
-        print("-" * 80)
-        for i, row in enumerate(preview_data[:5], 1):
-            print(f"Linha {i}:")
-            print(f"  Data: {row.get('data', 'N/A')}")
-            print(f"  Movimentação: {row.get('movimentacao', 'N/A')}")
-            print(f"  Código: {row.get('codigo', 'N/A')}")
-            print(f"  Ativo: {row.get('ativo_descricao', 'N/A')}")
-            print(f"  Quantidade: {row.get('quantidade', 'N/A')}")
-            print(f"  Preço Unit.: {row.get('preco_unitario', 'N/A')}")
-            print()
+        # print(f"\nPreview das primeiras linhas:")
+        # print("-" * 80)
+        # for i, row in enumerate(preview_data[:5], 1):
+        #     print(f"Linha {i}:")
+        #     print(f"  Data: {row.get('data', 'N/A')}")
+        #     print(f"  Movimentação: {row.get('movimentacao', 'N/A')}")
+        #     print(f"  Código: {row.get('codigo', 'N/A')}")
+        #     print(f"  Ativo: {row.get('ativo_descricao', 'N/A')}")
+        #     print(f"  Quantidade: {row.get('quantidade', 'N/A')}")
+        #     print(f"  Preço Unit.: {row.get('preco_unitario', 'N/A')}")
+        #     print()
 
-        if len(preview_data) > 5:
-            print(f"... e mais {len(preview_data) - 5} linhas")
+        # if len(preview_data) > 5:
+        #     print(f"... e mais {len(preview_data) - 5} linhas")
 
         print("-" * 80)
 
@@ -310,7 +310,7 @@ def importacao_loop():
         print("1. [CVM] Cadastro Empresas")
         print("2. [CVM] Valores Mobiliários")
         print("3. [B3] Posição consolidada")
-        print("4. Importar Movimentação da B3")
+        print("4. [B3] Movimentação")
         print("8. Voltar")
         ch = _input("> ").strip()
         if ch == "1":

@@ -1,45 +1,60 @@
 from typing import Optional
 from ..connection import get_conn
 
-def upsert(hash_linha: str, **kwargs) -> tuple[int, bool]:
+def upsert(hash_linha: str, conn=None, **kwargs) -> tuple[int, bool]:
 	"""
 	Insert or update movimentação by hash_linha.
 	Returns (id, was_inserted) where was_inserted is True for new records, False for updates.
 	"""
-	conn = get_conn()
+	if conn is None:
+		conn = get_conn()
+		should_close = True
+	else:
+		should_close = False
 	cur = conn.cursor()
 	
 	# Try to insert first
 	try:
 		cur.execute("""
-			INSERT INTO movimentacao(hash_linha, data, movimentacao, tipo_movimentacao, 
-									codigo, codigo_negociacao, ativo_descricao, quantidade,
+			INSERT INTO movimentacao(hash_linha, entrada_saida,data, movimentacao, produto, 
+									codigo, codigo_negociacao, instituicao, quantidade,
 									preco_unitario, valor_total_operacao)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-		""", (hash_linha, kwargs["data"], kwargs["movimentacao"], kwargs["tipo_movimentacao"],
-			  kwargs["codigo"], kwargs.get("codigo_negociacao"), kwargs["ativo_descricao"],
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+		""", (hash_linha, kwargs["entrada_saida"], kwargs["data"], kwargs["movimentacao"], kwargs["produto"],
+			  kwargs["codigo"], kwargs.get("codigo_negociacao"), kwargs["instituicao"],
 			  kwargs["quantidade"], kwargs["preco_unitario"], kwargs.get("valor_total_operacao")))
-		conn.commit()
-		nid = cur.lastrowid
-		conn.close()
-		return nid, True
-	except:
+		if should_close:
+			conn.commit()
+			nid = cur.lastrowid
+			conn.close()
+			
+		else:
+			nid = cur.lastrowid
+
+			return nid, True
+
+	except Exception as e:
 		# Hash already exists, update instead
-		conn.rollback()
+  
+
+		#conn.rollback()
 		cur.execute("""
-			UPDATE movimentacao SET data=?, movimentacao=?, tipo_movimentacao=?, 
-									codigo=?, codigo_negociacao=?, ativo_descricao=?, quantidade=?,
+			UPDATE movimentacao SET entrada_saida=?,data=?, movimentacao=?, produto=?, 
+									codigo=?, codigo_negociacao=?, instituicao=?, quantidade=?,
 									preco_unitario=?, valor_total_operacao=?, atualizado_em=datetime('now')
 			WHERE hash_linha=?;
-		""", (kwargs["data"], kwargs["movimentacao"], kwargs["tipo_movimentacao"],
-			  kwargs["codigo"], kwargs.get("codigo_negociacao"), kwargs["ativo_descricao"],
+		""", (kwargs["entrada_saida"], kwargs["data"], kwargs["movimentacao"], kwargs["produto"],
+			  kwargs["codigo"], kwargs.get("codigo_negociacao"), kwargs["instituicao"],
 			  kwargs["quantidade"], kwargs["preco_unitario"], kwargs.get("valor_total_operacao"),
 			  hash_linha))
-		conn.commit()
-		
+
 		# Get the ID of the updated record
 		row = conn.execute("SELECT id FROM movimentacao WHERE hash_linha=?;", (hash_linha,)).fetchone()
-		conn.close()
+		if should_close:
+			conn.commit()
+			conn.close()
+
+
 		return row["id"] if row else None, False
 
 def get_by_id(mid: int) -> Optional[dict]:

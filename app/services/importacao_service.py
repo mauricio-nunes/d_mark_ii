@@ -438,9 +438,11 @@ def _parse_produto(produto_str: str) -> tuple[str, str, str]:
     # Padrão: CODIGO - DESCRICAO ou CODIGO DESCRICAO
     parts = produto_str.split(' - ', 1)
     if len(parts) == 2:
-        codigo = parts[0].strip()
+        # codigo igual aos primeiros 04 caracteres do código de negociação
+        codigo = parts[0][:4].strip()
+        codigo_negociacao = parts[0].strip()
         descricao = parts[1].strip()
-        return codigo, codigo, descricao
+        return codigo, codigo_negociacao, descricao
     
     # Se não tem separador, pega primeira palavra como código
     words = produto_str.split()
@@ -454,7 +456,7 @@ def _parse_produto(produto_str: str) -> tuple[str, str, str]:
 def _calculate_hash(row_data: dict) -> str:
     """Calcula SHA-256 da linha normalizada para idempotência"""
     # Criar string normalizada dos campos principais
-    hash_string = f"{row_data['data']}|{row_data['movimentacao']}|{row_data['tipo_movimentacao']}|{row_data['codigo']}|{row_data['quantidade']}|{row_data['preco_unitario']}|{row_data.get('valor_total_operacao', '')}"
+    hash_string = f"{row_data['entrada_saida']}|{row_data['data']}|{row_data['movimentacao']}|{row_data['produto']}|{row_data['quantidade']}|{row_data['preco_unitario']}|{row_data['instituicao']}|{row_data.get('valor_total_operacao', '')}"
     return hashlib.sha256(hash_string.encode('utf-8')).hexdigest()
 
 def find_movimentacao_files(imports_dir: str = "imports") -> list[str]:
@@ -533,14 +535,16 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
     rows = read_xlsx_rows(path, sheet)
     
     # Mapear colunas esperadas
-    expected_columns = {
-        "Data": "data",
-        "Movimentação": "movimentacao",
-        "Produto": "produto", 
-        "Quantidade": "quantidade",
-        "Preço unitário": "preco_unitario",
-        "Valor da Operação": "valor_total_operacao"
-    }
+    # expected_columns = {
+    #     "Entrada/Saída" : "credito_debito",
+    #     "Data": "data",
+    #     "Movimentação": "movimentacao",
+    #     "Produto": "produto",
+    #     "Instituição": "instituicao",
+    #     "Quantidade": "quantidade",
+    #     "Preço unitário": "preco_unitario",
+    #     "Valor da Operação": "valor_total_operacao"
+    # }
     
     inseridas = 0
     atualizadas = 0
@@ -548,7 +552,6 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
     erros = 0
     
     # Processa em transação única
-    from ..db.connection import get_conn
     conn = get_conn()
     
     try:
@@ -557,33 +560,36 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
         for row in rows:
             try:
                 # Mapear campos do Excel
+                entrada_saida_raw = str(row.get("Entrada/Saída", "")).strip()
                 data_raw = str(row.get("Data", "")).strip()
                 movimentacao_raw = str(row.get("Movimentação", "")).strip()
                 produto_raw = str(row.get("Produto", "")).strip()
+                instituicao_raw = str(row.get("Instituição", "")).strip()
                 quantidade_raw = str(row.get("Quantidade", "")).strip()
                 preco_raw = str(row.get("Preço unitário", "")).strip()
                 valor_raw = str(row.get("Valor da Operação", "")).strip()
                 
                 # Ignorar linhas vazias
-                if not data_raw or not movimentacao_raw or not produto_raw:
+                if not entrada_saida_raw or not data_raw or not movimentacao_raw or not produto_raw or not instituicao_raw:
                     ignoradas += 1
                     continue
                 
                 # Transformar dados
+                entrada_saida = _normalize_string(entrada_saida_raw)
                 data = _parse_date(data_raw)
                 movimentacao = _normalize_string(movimentacao_raw)
                 
                 # Determinar tipo de movimentação
-                if "credito" in movimentacao or "entrada" in movimentacao:
-                    tipo_movimentacao = "credito"
-                elif "debito" in movimentacao or "saida" in movimentacao:
-                    tipo_movimentacao = "debito"
-                else:
-                    # Assumir crédito por padrão
-                    tipo_movimentacao = "credito"
+                # if "credito" in movimentacao or "entrada" in movimentacao:
+                #     tipo_movimentacao = "credito"
+                # elif "debito" in movimentacao or "saida" in movimentacao:
+                #     tipo_movimentacao = "debito"
+                # else:
+                #     # Assumir crédito por padrão
+                #     tipo_movimentacao = "credito"
                 
                 # Processar produto
-                codigo, codigo_negociacao, ativo_descricao = _parse_produto(produto_raw)
+                codigo, codigo_negociacao, produto = _parse_produto(produto_raw)
                 
                 # Processar valores numéricos
                 quantidade_decimal = _normalize_decimal(quantidade_raw)
@@ -602,12 +608,13 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
                 
                 # Preparar dados para inserção
                 row_data = {
+                    "entrada_saida": entrada_saida,
                     "data": data,
                     "movimentacao": movimentacao,
-                    "tipo_movimentacao": tipo_movimentacao,
+                    "produto" : produto,
                     "codigo": codigo,
-                    "codigo_negociacao": codigo_negociacao if codigo_negociacao != codigo else None,
-                    "ativo_descricao": ativo_descricao,
+                    "codigo_negociacao": codigo_negociacao,
+                    "instituicao": instituicao_raw,
                     "quantidade": quantidade,
                     "preco_unitario": preco_unitario,
                     "valor_total_operacao": valor_total_operacao
@@ -617,8 +624,8 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
                 hash_linha = _calculate_hash(row_data)
                 
                 # Fazer upsert
-                _, was_inserted = movimentacao_repo.upsert(hash_linha, **row_data)
-                
+                _, was_inserted = movimentacao_repo.upsert(hash_linha, conn=conn, **row_data)
+
                 if was_inserted:
                     inseridas += 1
                 else:
@@ -635,6 +642,7 @@ def importar_movimentacao(path: str, sheet: str = None) -> tuple[int, int, int, 
         conn.execute("ROLLBACK;")
         raise ValidationError(f"Erro na importação: {e}")
     finally:
+        _move_to_processed(path)
         conn.close()
     
     return inseridas, atualizadas, ignoradas, erros

@@ -81,3 +81,32 @@ def count() -> int:
 	row = conn.execute("SELECT COUNT(*) as total FROM movimentacao;").fetchone()
 	conn.close()
 	return row["total"] if row else 0
+
+def ticker_exists(ticker: str) -> bool:
+	"""Verifica se o ticker existe em movimentacao"""
+	conn = get_conn()
+	row = conn.execute("SELECT 1 FROM movimentacao WHERE codigo_negociacao = ? LIMIT 1;", (ticker,)).fetchone()
+	conn.close()
+	return row is not None
+
+def list_by_codigo(codigo: str, consolidado: bool = False) -> list[dict]:
+	"""Lista movimentações por codigo"""
+	conn = get_conn()
+	rows = conn.execute("""
+		SELECT * FROM movimentacao 
+		WHERE codigo = ? AND (consolidado = ? OR consolidado IS NULL)
+		ORDER BY date(data) ASC , movimentacao DESC;
+	""", (codigo, int(consolidado))).fetchall()
+	conn.close()
+	return [dict(row) for row in rows]
+
+def list_by_codigo_negociacao(codigo: str, consolidado: bool = False) -> list[dict]:
+	"""Lista movimentações por codigo"""
+	conn = get_conn()
+	rows = conn.execute("""
+		SELECT * FROM movimentacao 
+		WHERE codigo_negociacao = ? AND (consolidado = ? OR consolidado IS NULL)
+		ORDER BY date(data) ASC , movimentacao DESC;
+	""", (codigo, int(consolidado))).fetchall()
+	conn.close()
+	return [dict(row) for row in rows]

@@ -135,11 +135,9 @@ CREATE INDEX IF NOT EXISTS idx_eventos_ticker ON eventos(ticker_antigo, ticker_n
 
 CREATE TABLE IF NOT EXISTS ticker_mapping (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ticker_antigo INTEGER NOT NULL,
-  ticker_novo INTEGER NOT NULL,
-  data_vigencia DATE NOT NULL,
-  FOREIGN KEY (ticker_antigo) REFERENCES ativos(id),
-  FOREIGN KEY (ticker_novo) REFERENCES ativos(id)
+  ticker_antigo TEXT NOT NULL,
+  ticker_novo TEXT NOT NULL,
+  data_vigencia DATE NOT NULL -- ISO date
 );
 
 CREATE INDEX IF NOT EXISTS idx_mapping_data ON ticker_mapping(data_vigencia);

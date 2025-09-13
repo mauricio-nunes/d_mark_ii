@@ -77,5 +77,19 @@ def editar_corretora(cid: int, nome: str, descricao: str = "") -> None:
         raise ValidationError("Corretora não encontrada.")
     _validate_nome_unique(nome, ignore_id=cid, conn=conn)
     corretoras_repo.update(cid, nome, descricao, conn=conn)
+    
+    now = datetime.now().strftime("%Y-%m-%d")
+    eventos_repo.criar(
+        {
+            "tipo": "corretora",
+            "entidade_id": cid,
+            "evento": "alteracao",
+            "nome": nome,
+            "data_ex": now,
+            "observacoes": f"Corretora '{descricao}' alterada.",
+        },
+        conn=conn,
+    )
+    
     conn.commit()
     conn.close()

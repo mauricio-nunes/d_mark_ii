@@ -40,8 +40,10 @@ def handle_main_choice(choice: str) -> bool:
             pause()
         case "3":
             eventos_loop()
+            pause()
         case "4":
             importacao_loop()
+            pause()
         case "5":
             consultas_loop()
             pause()
@@ -50,6 +52,7 @@ def handle_main_choice(choice: str) -> bool:
             pause()
         case "7":
             config_loop()
+            pause()
         case "9" | "q" | "sair" | "exit":
             return False
         case _:

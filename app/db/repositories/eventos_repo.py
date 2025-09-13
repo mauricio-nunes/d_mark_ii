@@ -1,14 +1,16 @@
 from typing import List, Optional
 from ..connection import get_conn
 
-def create(data: dict) -> int:
-    conn = get_conn(); cur = conn.cursor()
+def criar(data: dict , conn=None) -> int:
+    cur = conn.cursor()
     cur.execute("""
-        INSERT INTO eventos(tipo, ticker_antigo, ticker_novo, data_ex, num, den, observacoes, ativo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1);
-    """, (data["tipo"], data.get("ticker_antigo"), data.get("ticker_novo"),
-          data["data_ex"], data.get("num"), data.get("den"), data.get("observacoes","")))
-    conn.commit(); nid = cur.lastrowid; conn.close(); return nid
+        INSERT INTO eventos(tipo,entidade_id,evento,nome, ticker_antigo, ticker_novo, data_ex, observacoes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, (data["tipo"], data.get("entidade_id"), data.get("evento"), data.get("nome"), data.get("ticker_antigo"), data.get("ticker_novo"),
+          data["data_ex"], data.get("observacoes","")))
+    
+    nid = cur.lastrowid
+    return nid
 
 def update(eid: int, data: dict) -> None:
     conn = get_conn()

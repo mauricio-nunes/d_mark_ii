@@ -6,7 +6,11 @@ from app.core.utils import ensure_dirs
 from app.ui.menu import main_loop
 from app.services.auth_service import login_flow
 
+
 def main():
+    # Transição simples
+    os.system("cls" if os.name == "nt" else "clear")
+
     colorama_init()
     ensure_dirs()
     splash()
@@ -22,6 +26,7 @@ def main():
 
     # Loop principal
     main_loop()
+
 
 if __name__ == "__main__":
     main()

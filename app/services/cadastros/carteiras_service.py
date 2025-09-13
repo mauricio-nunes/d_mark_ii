@@ -8,18 +8,26 @@ def _unique(nome: str, ignore_id: int | None = None):
     found = repo.get_by_nome(nome)
     if found and (ignore_id is None or found["id"] != ignore_id):
         raise ValidationError("Já existe uma carteira com esse nome.")
+    
+def contar(texto: str = "", apenas_ativas: bool = True) -> int:
+    return repo.count_carteiras(texto, apenas_ativas)
 
 def criar(nome: str, descricao: str = "") -> int:
-    _unique(nome); return repo.create(nome, descricao)
+    _unique(nome); 
+    return repo.create(nome, descricao)
 
 def editar(cid: int, nome: str, descricao: str = ""):
-    if not repo.get_by_id(cid): raise ValidationError("Carteira não encontrada.")
-    _unique(nome, ignore_id=cid); repo.update(cid, nome, descricao)
+    if not repo.get_by_id(cid): 
+        raise ValidationError("Carteira não encontrada.")
+    _unique(nome, ignore_id=cid) 
+    repo.update(cid, nome, descricao)
 
 def inativar(cid: int): 
-    if not repo.get_by_id(cid): raise ValidationError("Carteira não encontrada.")
+    if not repo.get_by_id(cid): 
+        raise ValidationError("Carteira não encontrada.")
     repo.inativar(cid)
 
 def reativar(cid: int): 
-    if not repo.get_by_id(cid): raise ValidationError("Carteira não encontrada.")
+    if not repo.get_by_id(cid): 
+        raise ValidationError("Carteira não encontrada.")
     repo.reativar(cid)

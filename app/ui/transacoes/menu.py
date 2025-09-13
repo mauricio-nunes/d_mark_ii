@@ -5,11 +5,13 @@ from ...core.utils import clear_screen
 from .transacoes import tela_transacoes
 from .proventos import tela_proventos
 from .transferencia import tela_transferencia
+from .consolidar_movimentacao import tela_consolidar_movimentacao
 
 ITEMS = [
     "Lançar/Editar Transação",
     "Lançar/Editar Provento",
     "Transferência entre Carteiras",
+    "Consolidar Movimentação",
     "Voltar",
 ]
 
@@ -28,5 +30,6 @@ def transacoes_loop():
             case "1": tela_transacoes()
             case "2": tela_proventos()
             case "3": tela_transferencia()
-            case "4" | "q" | "voltar": keep = False
+            case "4": tela_consolidar_movimentacao()
+            case "5" | "q" | "voltar": keep = False
             case _: print("Opção inválida."); pause()

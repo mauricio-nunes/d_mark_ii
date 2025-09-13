@@ -23,10 +23,8 @@ def delete(mid: int) -> None:
 def list(offset: int = 0, limit: int = 100) -> List[dict]:
     conn = get_conn()
     rows = conn.execute("""
-        SELECT tm.*, a1.ticker AS ticker_antigo_str, a2.ticker AS ticker_novo_str
-          FROM ticker_mapping tm
-          LEFT JOIN ativos a1 ON a1.id = tm.ticker_antigo
-          LEFT JOIN ativos a2 ON a2.id = tm.ticker_novo
+        SELECT id, ticker_antigo, ticker_novo, data_vigencia
+          FROM ticker_mapping 
          ORDER BY data_vigencia ASC, id ASC
          LIMIT ? OFFSET ?;
     """, (limit, offset)).fetchall()

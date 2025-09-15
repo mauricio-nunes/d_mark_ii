@@ -1,5 +1,5 @@
 -- Migração para tabela de movimentação da B3
-PRAGMA foreign_keys = ON;
+-- PRAGMA foreign_keys = ON;
 
 -- CREATE TABLE IF NOT EXISTS movimentacao (
 --   id INTEGER PRIMARY KEY AUTOINCREMENT,

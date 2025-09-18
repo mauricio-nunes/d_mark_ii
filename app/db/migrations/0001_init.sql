@@ -40,6 +40,16 @@ CREATE TABLE IF NOT EXISTS ativos (
   FOREIGN KEY (empresa_id) REFERENCES empresas(id)
 );
 
+-------------- CORRETORAS  ------------
+CREATE TABLE IF NOT EXISTS corretoras (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT UNIQUE NOT NULL,
+  descricao TEXT NOT NULL,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 
 
 -------------- PROVENTOS ------------
@@ -48,6 +58,7 @@ CREATE TABLE IF NOT EXISTS proventos (
   data_referencia TEXT NOT NULL,  -- YYYY-MM-DD (último dia do mês)
   ativo INTEGER NOT NULL,
   ativo_id INTEGER NOT NULL,
+  corretora_id INTEGER NOT NULL,
   descricao TEXT,
   data_pagamento TEXT NOT NULL, -- ISO date
   tipo_evento TEXT NOT NULL, -- DIVIDENDO|JCP|RENDIMENTO FII|AMORTIZACAO|OUTROS
@@ -58,18 +69,11 @@ CREATE TABLE IF NOT EXISTS proventos (
   observacoes TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (ativo_id) REFERENCES ativos(id)
+  FOREIGN KEY (ativo_id) REFERENCES ativos(id),
+  FOREIGN KEY (corretora_id) REFERENCES corretoras(id)
 );
 
--------------- CORRETORAS  ------------
-CREATE TABLE IF NOT EXISTS corretoras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nome TEXT UNIQUE NOT NULL,
-  descricao TEXT NOT NULL,
-  ativo INTEGER NOT NULL DEFAULT 1,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
-);
+
 
 
 CREATE TABLE IF NOT EXISTS eventos (
@@ -116,6 +120,7 @@ CREATE TABLE IF NOT EXISTS carteiras_ativos (
 	instituicao TEXT NOT NULL,                        -- Nome da corretora
 	conta TEXT NOT NULL,                              -- Número da conta
 	ativo_id INTEGER NOT NULL,
+  corretora_id INTEGER NOT NULL,
 	codigo_negociacao TEXT NOT NULL,                  -- Ticker/código de negociação
 	cnpj_empresa TEXT NOT NULL,                       -- CNPJ da empresa emissora
 	codigo_isin TEXT NOT NULL,                        -- Código ISIN
@@ -138,7 +143,8 @@ CREATE TABLE IF NOT EXISTS carteiras_ativos (
 	valor_atualizado_mtm TEXT NOT NULL DEFAULT '0',  -- Decimal string
 	criado_em TEXT NOT NULL DEFAULT (datetime('now')),
 	atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (ativo_id) REFERENCES ativos(id)
+  FOREIGN KEY (ativo_id) REFERENCES ativos(id),
+  FOREIGN KEY (corretora_id) REFERENCES corretoras(id)
 );
 
 -- Índice único para evitar duplicações por competência/conta/ticker

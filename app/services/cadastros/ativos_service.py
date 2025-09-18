@@ -1,6 +1,9 @@
 from ...db.connection import get_conn
 from ...db.repositories.ativos_repo import AtivosRepo as ativos_repo
 from ...db.repositories.empresas_repo import  EmpresasRepo as empresas_repo
+from ...db.repositories.eventos_repo import EventosRepo as eventos_repo
+from datetime import datetime
+
 class ValidationError(Exception): ...
 
 CLASSES = ("Acao","FII","Tesouro","BDR","ETF")
@@ -10,6 +13,7 @@ class AtivosService:
         conn = get_conn()
         self.ativo_repo = ativos_repo(conn)
         self.empresa_repo = empresas_repo(conn)
+        self.evento_repo = eventos_repo(conn)
 
 
 
@@ -42,17 +46,49 @@ class AtivosService:
         if not nome or not nome.strip(): raise ValidationError("Nome é obrigatório.")
         emp_id = self._empresa_optional(empresa_id)
         ativo =  self.ativo_repo.criar(ticker, nome, classe, emp_id)
+        
+        now = datetime.now().strftime("%Y-%m-%d")
+        self.evento_repo.criar(
+            {
+                "tipo": "ativo",
+                "entidade_id": ativo,
+                "evento": "criacao",
+                "ticker_antigo": None,
+                "ticker_novo": ticker,
+                "data_ex": now,
+                "observacoes": f"Ativo '{ticker}' criado.",
+            }
+        )
+        
         self.dispose()
         return ativo
 
     def editar_ativo(self, aid: int, ticker: str, nome: str, classe: str, empresa_id):
-        if not self.ativo_repo.get_by_id(aid): 
+        ativo_atual = self.ativo_repo.get_by_id(aid)
+        if not ativo_atual: 
             raise ValidationError("Ativo não encontrado.")
+
         self._unique_ticker(ticker, ignore_id=aid)
         if classe not in CLASSES: raise ValidationError(f"Classe inválida. Use uma de {CLASSES}.")
         if not nome or not nome.strip(): raise ValidationError("Nome é obrigatório.")
         emp_id = self._empresa_optional(empresa_id)
         self.ativo_repo.editar(aid, ticker, nome, classe, emp_id)
+        
+        if ativo_atual["ticker"] != ticker:
+            now = datetime.now().strftime("%Y-%m-%d")
+            self.evento_repo.criar(
+                {
+                    "tipo": "ativo",
+                    "entidade_id": aid,
+                    "evento": "edicao",
+                    "ticker_antigo": ativo_atual["ticker"],
+                    "ticker_novo": ticker,
+                    "data_ex": now,
+                    "observacoes": f"Ativo '{ticker}' editado.",
+                }
+            )
+        
+        
         self.dispose()
         
     def get_ativo_por_id(self, aid: int) -> dict | None:

@@ -3,9 +3,6 @@ from ..widgets import title, divider, pause, confirm
 from ..prompts import prompt_menu_choice
 from ...core.utils import clear_screen
 from ...core.pagination import Paginator
-# from ...db.repositories import ativos_repo as repo
-# from ...db.repositories import empresas_repo
-#from ...services.cadastros.ativos_service import ValidationError, CLASSES, criar, editar, inativar, reativar
 from ...services.cadastros.ativos_service import (
     AtivosService as ativos_service,
     ValidationError,
@@ -38,11 +35,6 @@ def _coleta_campos(reg=None):
         except: empresa_id = None
     return {"ticker": ticker, "nome": nome, "classe": classe, "empresa_id": empresa_id}
 
-# def _listar_empresas_pequeno():
-#     rows = empresas_repo.list("", True, 0, 10)
-#     print(Fore.MAGENTA + "Algumas empresas (use o ID):" + Style.RESET_ALL)
-#     for r in rows:
-#         print(f"  {r['id']:>3} - {r['razao_social']} ({r['cnpj']})")
 
 def tela_ativos():
     filtro, apenas_ativos = "", True

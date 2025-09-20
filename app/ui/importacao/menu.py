@@ -9,17 +9,54 @@ from ...services.importacao_service import (
     find_movimentacao_files,
     preview_movimentacao,
     importar_movimentacao,
-    find_b3_posicao_files,
     validar_competencia,
     importar_b3_posicao,
     parse_data_referencia_from_filename,
     ValidationError,
 )
+
+import datetime
+from ...services.importacao.posicao_consolidada_service import (
+    ValidationError,
+    PosicaoConsolidadaService as posicao_consolidada_service)
+
+from ...services.importacao.empresas_service import ValidationError, EmpresasService as importacao_empresas_service
+
 from ...core.xlsx import list_sheets
 
 
 def _input(t):
     return input(Fore.WHITE + t + Style.RESET_ALL)
+
+
+def importar_fundos_empresas_flow():
+   
+    clear_screen()
+    title("Importar / Atualizar o  Cadastro Empresas e Fundos CVM")
+
+   
+
+    print(f"Iniciando importação de empresas e fundos CVM ...")
+    print("Isso pode levar alguns minutos...")
+
+    try:
+        inserted, updated, ignored, errors = importacao_empresas_service().importar()
+
+        clear_screen()
+        title("Importação CVM Concluída")
+        print(f"Ano: {year}")
+        print(f"Empresas incluídas: {inserted}")
+        print(f"Empresas atualizadas: {updated}")
+        print(f"Empresas ignoradas: {ignored}")
+        print(f"Erros: {errors}")
+        print(f"Total processado: {inserted + updated + ignored + errors}")
+
+    except Exception as e:
+        print(f"Erro durante importação: {e}")
+
+    pause()
+
+
 
 def importar_empresas_cvm_flow():
     """Import CVM companies with year selection."""
@@ -111,16 +148,17 @@ def importar_valores_mobiliarios_flow():
 
     pause()
 
-
-def importar_b3_posicao_flow():
+def importar_posicao_flow():
     """Import Planilha Posição Consolidada B3."""
     clear_screen()
     title("Importar [B3] Posição Consolidada")
 
-    # Encontrar arquivos na pasta imports
-    files = find_b3_posicao_files()
+    posicao_service = posicao_consolidada_service()
 
-    if not files:
+    # Encontrar arquivos na pasta imports
+    arquivos = posicao_service.procurar_arquivos_posicao()
+
+    if not arquivos:
         print("Nenhum arquivo de posição consolidada encontrado na pasta 'imports'.")
         print(
             "Procurando arquivos no padrão: relatorio-consolidado-mensal-{ano}-{mes}.xlsx"
@@ -129,14 +167,14 @@ def importar_b3_posicao_flow():
         return
 
     # Se múltiplos arquivos, deixar usuário escolher
-    if len(files) == 1:
-        selected_file = files[0]
+    if len(arquivos) == 1:
+        selected_file = arquivos[0]
         print(f"Arquivo encontrado: {os.path.basename(selected_file)}")
     else:
         print("Arquivos encontrados (até 10, ordenados por data de modificação):")
-        for i, file in enumerate(files, 1):
+        for i, file in enumerate(arquivos, 1):
             mtime = os.path.getmtime(file)
-            import datetime
+
 
             mtime_str = datetime.datetime.fromtimestamp(mtime).strftime(
                 "%d/%m/%Y %H:%M"
@@ -145,8 +183,8 @@ def importar_b3_posicao_flow():
 
         try:
             choice = int(_input("Escolha o arquivo (número): ").strip())
-            if 1 <= choice <= len(files):
-                selected_file = files[choice - 1]
+            if 1 <= choice <= len(arquivos):
+                selected_file = arquivos[choice - 1]
             else:
                 print("Opção inválida.")
                 pause()
@@ -160,7 +198,7 @@ def importar_b3_posicao_flow():
 
     try:
         # Verificar a data de referência no nome do arquivo
-        data_ref = parse_data_referencia_from_filename(selected_file)
+        data_ref = posicao_service.data_referencia_arquivo(selected_file)
 
         sheets = list_sheets(selected_file)
 
@@ -172,7 +210,7 @@ def importar_b3_posicao_flow():
 
         print("-" * 100)
 
-        if validar_competencia(data_ref):
+        if posicao_service.validar_competencia(data_ref):
             competencia = data_ref[:7]  # YYYY-MM
             print(f"Já existem dados para a competência {competencia}.")
             if not confirm("Sobrescrever dados existentes? (S/N) "):
@@ -183,7 +221,7 @@ def importar_b3_posicao_flow():
         # Confirmar importação
         if confirm("Confirmar importação? (S/N) "):
 
-            inseridas, removidas, erros = importar_b3_posicao(selected_file, data_ref, sheets)
+            inseridas, removidas, erros = posicao_service.importar_posicao(selected_file, data_ref, sheets)
 
             # Relatório final
             clear_screen()
@@ -307,10 +345,11 @@ def importacao_loop():
     while True:
         clear_screen()
         title("Importação")
-        print("1. [CVM] Cadastro Empresas")
-        print("2. [CVM] Valores Mobiliários")
+        print("1. [CVM - FCA] Cadastro Empresas")
+        print("2. [CVM - FCA] Valores Mobiliários")
         print("3. [B3] Posição consolidada")
         print("4. [B3] Movimentação")
+        print("5. [CVM] Cadastro de Fundos e Empresas")
         print("8. Voltar")
         ch = _input("> ").strip()
         if ch == "1":
@@ -318,8 +357,10 @@ def importacao_loop():
         elif ch == "2":
             importar_valores_mobiliarios_flow()
         elif ch == "3":
-            importar_b3_posicao_flow()
+            importar_posicao_flow()
         elif ch == "4":
             importar_movimentacao_b3_flow()
+        elif ch == "5":
+            importar_fundos_empresas_flow()
         else:
             break

@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS corretoras (
 CREATE TABLE IF NOT EXISTS proventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   data_referencia TEXT NOT NULL,  -- YYYY-MM-DD (último dia do mês)
-  ativo INTEGER NOT NULL,
+  ativo TEXT NOT NULL,
   ativo_id INTEGER NOT NULL,
   corretora_id INTEGER NOT NULL,
   descricao TEXT,

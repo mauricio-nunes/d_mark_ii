@@ -93,3 +93,14 @@ class EventosRepo:
             (*p, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def listar_eventos_por_tipo(self, tipo: str) -> List[dict]:
+        rows = self.conn.execute(
+            """
+            SELECT * FROM eventos
+            WHERE tipo=? AND ativo=1 
+            ORDER BY data_ex ASC, id ASC;
+        """,
+            (tipo,),
+        ).fetchall()
+        return [dict(r) for r in rows]

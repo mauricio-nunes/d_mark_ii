@@ -1,5 +1,7 @@
 PRAGMA foreign_keys = ON;
 
+
+-------------- USUARIOS ------------
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
@@ -10,46 +12,25 @@ CREATE TABLE IF NOT EXISTS users (
   criado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS corretoras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nome TEXT UNIQUE NOT NULL,
-  descricao TEXT,
-  ativo INTEGER NOT NULL DEFAULT 1,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  inativado_em TEXT
-);
 
-CREATE TABLE IF NOT EXISTS carteiras (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nome TEXT UNIQUE NOT NULL,
-  descricao TEXT,
-  ativo INTEGER NOT NULL DEFAULT 1,
-  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  inativado_em TEXT
-);
-
+-------------- EMPRESAS ------------
 CREATE TABLE IF NOT EXISTS empresas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   cnpj TEXT UNIQUE NOT NULL, -- somente dígitos
   razao_social TEXT NOT NULL,
-  codigo_cvm TEXT UNIQUE NOT NULL,
-  data_constituicao TEXT, -- ISO date
   setor_atividade TEXT,
-  situacao TEXT,
-  controle_acionario TEXT,
   tipo_empresa TEXT NOT NULL, -- 'Fundo' | 'CiaAberta'
-  categoria_registro TEXT NOT NULL,
-  controle_id INTEGER NOT NULL, -- numero de controle para upsert caso a empresa já exista
-  pais_origem TEXT NOT NULL,
-  pais_custodia TEXT NOT NULL,
-  situacao_emissor TEXT NOT NULL, 
-  dia_encerramento_fiscal INTEGER NOT NULL,
-  mes_encerramento_fiscal INTEGER NOT NULL,
+  codigo_cvm INT, -- código CVM
+  situacao_emissor TEXT,
+  controle_acionario TEXT,
+  data_constituicao TEXT, -- ISO date
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+
+-------------- ATIVOS  ------------
 
 CREATE TABLE IF NOT EXISTS ativos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,48 +38,31 @@ CREATE TABLE IF NOT EXISTS ativos (
   nome TEXT NOT NULL,
   classe TEXT NOT NULL, -- 'Acao' | 'FII' | 'Tesouro' | 'BDR' | 'ETF'
   empresa_id INTEGER,
-  controle_id INTEGER NOT NULL,
-  valor_mobiliario TEXT NOT NULL,
-  sigla_classe_acao TEXT  NULL,
-  classe_acao TEXT  NULL,
-  composicao TEXT NULL,
-  mercado TEXT NOT NULL, -- 'B3' | 'OTC' | 'NYSE' | 'NASDAQ' | 'ARCA' | 'AMEX' | 'OTHER'
-  data_inicio_negociacao TEXT NOT NULL, -- ISO date
-  data_fim_negociacao TEXT NULL, -- ISO date
-  segmento TEXT NOT NULL DEFAULT 0,
-  importado INTEGER NOT NULL DEFAULT 0, -- 0=manual, 1=importado
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (empresa_id) REFERENCES empresas(id)
 );
 
-CREATE TABLE IF NOT EXISTS transacoes (
+-------------- CORRETORAS  ------------
+CREATE TABLE IF NOT EXISTS corretoras (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  data TEXT NOT NULL, -- ISO date
-  tipo TEXT NOT NULL, -- COMPRA|VENDA|BONIFICACAO|SUBSCRICAO|AMORTIZACAO|TRANSFERENCIA|EVENTO
-  corretora_id INTEGER,
-  quantidade TEXT NOT NULL, -- Decimal string (6 casas)
-  ticker INTEGER NOT NULL,  -- FK para ativos.id
-  carteira_id INTEGER NOT NULL,
-  preco_unitario TEXT,      -- Decimal string (4 casas)
-  taxas TEXT DEFAULT '0',   -- Decimal string (4 casas)
-  observacoes TEXT,
+  nome TEXT UNIQUE NOT NULL,
+  descricao TEXT NOT NULL,
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (corretora_id) REFERENCES corretoras(id),
-  FOREIGN KEY (ticker) REFERENCES ativos(id),
-  FOREIGN KEY (carteira_id) REFERENCES carteiras(id)
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_transacoes_ticker_data ON transacoes(ticker, data);
-CREATE INDEX IF NOT EXISTS idx_transacoes_carteira ON transacoes(carteira_id);
 
+
+-------------- PROVENTOS ------------
 CREATE TABLE IF NOT EXISTS proventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   data_referencia TEXT NOT NULL,  -- YYYY-MM-DD (último dia do mês)
-  ticker INTEGER NOT NULL,
+  ativo TEXT NOT NULL,
+  ativo_id INTEGER NOT NULL,
+  corretora_id INTEGER NOT NULL,
   descricao TEXT,
   data_pagamento TEXT NOT NULL, -- ISO date
   tipo_evento TEXT NOT NULL, -- DIVIDENDO|JCP|RENDIMENTO FII|AMORTIZACAO|OUTROS
@@ -108,52 +72,114 @@ CREATE TABLE IF NOT EXISTS proventos (
   valor_total TEXT,      -- opcional
   observacoes TEXT,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
-  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (ativo_id) REFERENCES ativos(id),
+  FOREIGN KEY (corretora_id) REFERENCES corretoras(id)
 );
 
 
 
-CREATE INDEX IF NOT EXISTS idx_proventos_ticker_data ON proventos(ticker, data_pagamento);
 
 CREATE TABLE IF NOT EXISTS eventos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  tipo TEXT NOT NULL, -- Split|Inplit|Bonificacao|TrocaTicker
-  ticker_antigo INTEGER,
-  ticker_novo INTEGER,
+  tipo TEXT NOT NULL, --- corretora|ativo
+  entidade_id INTEGER NOT NULL, -- id da corretora ou do ativo
+  evento TEXT NOT NULL, 
+  nome TEXT, -- nome da corretora ou do ativo
+  ticker_antigo TEXT,
+  ticker_novo TEXT,
   data_ex TEXT NOT NULL, -- ISO date
-  num INTEGER DEFAULT 0,
-  --den INTEGER DEFAULT 0,
   observacoes TEXT,
   ativo INTEGER NOT NULL DEFAULT 1,
-  FOREIGN KEY (ticker_antigo) REFERENCES ativos(id),
-  FOREIGN KEY (ticker_novo) REFERENCES ativos(id)
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_eventos_data ON eventos(data_ex);
-CREATE INDEX IF NOT EXISTS idx_eventos_ticker ON eventos(ticker_antigo, ticker_novo);
-
-
-CREATE TABLE IF NOT EXISTS ticker_mapping (
+-------------- CARTEIRAS  ------------
+CREATE TABLE IF NOT EXISTS carteiras (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ticker_antigo TEXT NOT NULL,
-  ticker_novo TEXT NOT NULL,
-  data_vigencia DATE NOT NULL -- ISO date
+  nome TEXT UNIQUE NOT NULL,
+  descricao TEXT,
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  ativo INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE INDEX IF NOT EXISTS idx_mapping_data ON ticker_mapping(data_vigencia);
-
-CREATE TABLE IF NOT EXISTS fechamentos_mensais (
+CREATE TABLE IF NOT EXISTS carteiras_ativos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ticker INTEGER NOT NULL,
-  data_ref TEXT NOT NULL,         -- último dia do mês (conforme regra)
-  preco_fechamento TEXT NOT NULL, -- Decimal string (4)
-  quantidade TEXT,                -- posição consolidada
-  FOREIGN KEY (ticker) REFERENCES ativos(id)
+  carteira_id INTEGER NOT NULL,
+  ativo_id INTEGER NOT NULL,
+  percentual_requerido TEXT NOT NULL DEFAULT '100.00', -- Decimal string (2 casas)
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (carteira_id) REFERENCES carteiras(id),
+  FOREIGN KEY (ativo_id) REFERENCES ativos(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_fechamentos_ticker_data ON fechamentos_mensais(ticker, data_ref);
-
-CREATE TABLE IF NOT EXISTS config (
-  chave TEXT PRIMARY KEY,
-  valor TEXT
+---------------- POSICAO CONSOLIDADA B3 ------------
+  CREATE TABLE IF NOT EXISTS posicao_consolidada (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	data_referencia TEXT NOT NULL,                    -- YYYY-MM-DD (último dia do mês)
+	produto TEXT NOT NULL,                             -- Nome do produto
+	instituicao TEXT NOT NULL,                        -- Nome da corretora
+	conta TEXT NOT NULL,                              -- Número da conta
+	ativo_id INTEGER NOT NULL,
+  corretora_id INTEGER NOT NULL,
+	codigo_negociacao TEXT NOT NULL,                  -- Ticker/código de negociação
+	cnpj_empresa TEXT NOT NULL,                       -- CNPJ da empresa emissora
+	codigo_isin TEXT NOT NULL,                        -- Código ISIN
+	tipo_indexador TEXT NOT NULL,
+	adm_escriturador_emissor TEXT NOT NULL,          -- Nome do administrador/escriturador
+	quantidade TEXT NOT NULL DEFAULT '0',            -- Decimal string
+	quantidade_disponivel TEXT NOT NULL DEFAULT '0',  -- Decimal string
+	quantidade_indisponivel TEXT NOT NULL DEFAULT '0', -- Decimal string
+	motivo TEXT,
+	preco_fechamento TEXT NOT NULL,
+	data_vencimento TEXT,
+	valor_aplicado TEXT NOT NULL DEFAULT '0',            -- Decimal string
+	valor_liquido TEXT NOT NULL DEFAULT '0',            -- Decimal string
+	valor_atualizado TEXT NOT NULL DEFAULT '0',       -- Decimal string
+	tipo_ativo TEXT NOT NULL,
+	tipo_regime TEXT,
+	data_emissao TEXT,
+	contraparte TEXT,
+	preco_atualizado_mtm TEXT NOT NULL DEFAULT '0',  -- Decimal string
+	valor_atualizado_mtm TEXT NOT NULL DEFAULT '0',  -- Decimal string
+	criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+	atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (ativo_id) REFERENCES ativos(id),
+  FOREIGN KEY (corretora_id) REFERENCES corretoras(id)
 );
+
+-- Índice único para evitar duplicações por competência/conta/ticker
+CREATE UNIQUE INDEX IF NOT EXISTS idx_b3_posicao_unique 
+	ON posicao_consolidada(data_referencia, instituicao, codigo_isin);
+
+-------------- MOVIMENTAÇÃO B3 ------------
+CREATE TABLE IF NOT EXISTS movimentacao (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  hash_linha TEXT UNIQUE NOT NULL,  -- SHA-256 para idempotência
+  entrada_saida TEXT NOT NULL,      -- normalizada (minúsculas sem acentos credito / debito)
+  data TEXT NOT NULL,               -- YYYY-MM-DD
+  movimentacao TEXT NOT NULL,       -- normalizada (minúsculas sem acentos)
+  produto TEXT NOT NULL,    -- descrição do ativo
+  codigo TEXT NOT NULL,             -- código do ativo
+  codigo_negociacao TEXT,           -- código de negociação (pode ser NULL)
+  ativo_id INTEGER NOT NULL,
+  instituicao TEXT NOT NULL,        -- nome da instituição financeira
+  quantidade TEXT NOT NULL,         -- Decimal string positivo
+  preco_unitario TEXT NOT NULL,     -- Decimal string com 3 casas decimais
+  valor_total_operacao TEXT,        -- Decimal string ou NULL para subscrições sem valor
+  criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (ativo_id) REFERENCES ativos(id)
+);
+
+-- Índice único para garantir idempotência
+CREATE UNIQUE INDEX IF NOT EXISTS idx_movimentacao_hash ON movimentacao(hash_linha);
+
+-- Índices para consultas comuns
+CREATE INDEX IF NOT EXISTS idx_movimentacao_data ON movimentacao(data);
+CREATE INDEX IF NOT EXISTS idx_movimentacao_codigo ON movimentacao(codigo);
+
+

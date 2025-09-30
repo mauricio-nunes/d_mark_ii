@@ -3,14 +3,14 @@ from ..widgets import title, divider, pause, confirm
 from ..prompts import prompt_menu_choice
 from ...core.utils import clear_screen
 from ...core.pagination import Paginator
-from ...db.repositories import carteiras_repo as repo
-from ...services.cadastros.carteiras_service import ValidationError, criar, editar, inativar, reativar
+from ...services.cadastros.carteiras_service import(CarteirasService as carteiras_service, ValidationError)
 
 def _input(t): return input(Fore.WHITE + t + Style.RESET_ALL)
 
 def _header():
     title("Cadastro de Carteiras")
-    print("Comandos: [N] Próx.  [P] Ant.  [G] Ir pág.  [F] Filtrar  [I] Incluir  [E] Editar  [X] Inativar  [R] Reativar  [Q] Voltar")
+    print("Comandos:  [I] Incluir [E] Editar [X] Inativar   [R] Reativar [F] Filtrar")
+    print("Navegação: [N] Próx.   [P] Ant.   [G] Ir p/ pág. [Q] Voltar")
     divider()
 
 def _render(rows, page, pages, total, filtro, apenas_ativas):
@@ -23,11 +23,12 @@ def _render(rows, page, pages, total, filtro, apenas_ativas):
 
 def tela_carteiras():
     filtro, apenas_ativas = "", True
-    total = repo.count(filtro, apenas_ativas); pager = Paginator(total)
+    
+    total = carteiras_service().contar_carteiras(filtro, apenas_ativas); pager = Paginator(total)
     while True:
         clear_screen(); _header()
         start, end = pager.range()
-        rows = repo.list(filtro, apenas_ativas, start, pager.page_size)
+        rows =  carteiras_service().listar_carteiras(filtro, apenas_ativas, start, pager.page_size)
         _render(rows, pager.page, pager.pages, pager.total, filtro, apenas_ativas)
         ch = prompt_menu_choice("Selecione: ").strip().lower()
         if ch in ("q","voltar"): break
@@ -39,38 +40,41 @@ def tela_carteiras():
         elif ch=="f":
             filtro = _input("Texto (nome/descrição) [ENTER limpa]: "); ap = _input("Só ativas? (S/N) [S]: ").lower()
             apenas_ativas = False if ap in ("n","nao","não") else True
-            total = repo.count(filtro,apenas_ativas); pager = Paginator(total)
+            total = carteiras_service().contar_carteiras(filtro,apenas_ativas); pager = Paginator(total)
         elif ch=="i":
             nome = _input("Nome*: "); desc = _input("Descrição: ")
             try:
                 if confirm("Confirmar inclusão? (S/N) "):
-                    criar(nome, desc); print("Incluída.")
-                    total = repo.count(filtro,apenas_ativas); pager = Paginator(total)
+                    carteiras_service().criar_carteira(nome, desc); print("Incluída.")
+                    total = carteiras_service().contar_carteiras(filtro,apenas_ativas); pager = Paginator(total)
             except ValidationError as e: print(f"Erro: {e}")
             pause()
         elif ch=="e":
             try: cid = int(_input("ID: "))
             except: print("ID inválido."); pause(); continue
-            reg = repo.get_by_id(cid)
+            reg = carteiras_service().get_carteira_por_id(cid)
             if not reg: print("Não encontrada."); pause(); continue
             nome = _input(f"Nome* [{reg['nome']}]: ") or reg['nome']
             desc = _input(f"Descrição [{reg.get('descricao','')}]: ") or (reg.get('descricao','') or "")
             try:
-                if confirm("Confirmar alteração? (S/N) "): editar(cid, nome, desc); print("Atualizada.")
+                if confirm("Confirmar alteração? (S/N) "): 
+                    carteiras_service().editar_carteira(cid, nome, desc); print("Atualizada.")
             except ValidationError as e: print(f"Erro: {e}")
             pause()
         elif ch=="x":
             try: cid = int(_input("ID p/ inativar: "))
             except: print("ID inválido."); pause(); continue
             if confirm("Inativar? (S/N) "):
-                try: inativar(cid); print("Inativada.")
+                try: 
+                    carteiras_service().inativar_carteira(cid); print("Inativada.")
                 except ValidationError as e: print(f"Erro: {e}")
             pause()
         elif ch=="r":
             try: cid = int(_input("ID p/ reativar: "))
             except: print("ID inválido."); pause(); continue
             if confirm("Reativar? (S/N) "):
-                try: reativar(cid); print("Reativada.")
+                try: 
+                    carteiras_service().reativar_carteira(cid); print("Reativada.")
                 except ValidationError as e: print(f"Erro: {e}")
             pause()
         else:

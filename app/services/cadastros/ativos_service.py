@@ -1,40 +1,116 @@
-from ...db.repositories import ativos_repo as repo
-from ...db.repositories import empresas_repo
+from ...db.connection import get_conn
+from ...db.repositories.ativos_repo import AtivosRepo as ativos_repo
+from ...db.repositories.empresas_repo import  EmpresasRepo as empresas_repo
+from ...db.repositories.eventos_repo import EventosRepo as eventos_repo
+from datetime import datetime
+
 class ValidationError(Exception): ...
 
 CLASSES = ("Acao","FII","Tesouro","BDR","ETF")
 
-def _unique_ticker(ticker: str, ignore_id: int | None = None):
-    if not ticker or not ticker.strip(): raise ValidationError("Ticker é obrigatório.")
-    found = repo.get_by_ticker(ticker)
-    if found and (ignore_id is None or found["id"] != ignore_id):
-        raise ValidationError("Já existe ativo com esse ticker.")
+class AtivosService:
+    def __init__(self):
+        conn = get_conn()
+        self.ativo_repo = ativos_repo(conn)
+        self.empresa_repo = empresas_repo(conn)
+        self.evento_repo = eventos_repo(conn)
 
-def _empresa_optional(empresa_id):
-    if empresa_id in (None, "", 0): return None
-    emp = empresas_repo.get_by_id(int(empresa_id))
-    if not emp: raise ValidationError("Empresa vinculada não encontrada.")
-    return int(empresa_id)
 
-def criar(ticker: str, nome: str, classe: str, empresa_id):
-    _unique_ticker(ticker)
-    if classe not in CLASSES: raise ValidationError(f"Classe inválida. Use uma de {CLASSES}.")
-    if not nome or not nome.strip(): raise ValidationError("Nome é obrigatório.")
-    emp_id = _empresa_optional(empresa_id)
-    return repo.create(ticker, nome, classe, emp_id)
 
-def editar(aid: int, ticker: str, nome: str, classe: str, empresa_id):
-    if not repo.get_by_id(aid): raise ValidationError("Ativo não encontrado.")
-    _unique_ticker(ticker, ignore_id=aid)
-    if classe not in CLASSES: raise ValidationError(f"Classe inválida. Use uma de {CLASSES}.")
-    if not nome or not nome.strip(): raise ValidationError("Nome é obrigatório.")
-    emp_id = _empresa_optional(empresa_id)
-    repo.update(aid, ticker, nome, classe, emp_id)
 
-def inativar(aid: int):
-    if not repo.get_by_id(aid): raise ValidationError("Ativo não encontrado.")
-    repo.inativar(aid)
+    def _unique_ticker(self, ticker: str, ignore_id: int | None = None):
+        if not ticker or not ticker.strip(): raise ValidationError("Ticker é obrigatório.")
+        found = self.ativo_repo.get_by_ticker(ticker)
+        if found and (ignore_id is None or found["id"] != ignore_id):
+            raise ValidationError("Já existe ativo com esse ticker.")
 
-def reativar(aid: int):
-    if not repo.get_by_id(aid): raise ValidationError("Ativo não encontrado.")
-    repo.reativar(aid)
+    def _empresa_optional(self, empresa_id):
+        if empresa_id in (None, "", 0): return None
+        emp = self.empresa_repo.get_by_id(int(empresa_id))
+        if not emp: raise ValidationError("Empresa vinculada não encontrada.")
+        return int(empresa_id)
+
+    def contar_ativos(self, texto: str = "", apenas_ativas: bool = True) -> int:
+        total = self.ativo_repo.contar(texto, apenas_ativas)
+        self.close()
+        return total
+
+    def listar_ativos(self, texto: str = "", apenas_ativas: bool = True, offset: int = 0, limit: int = 20) -> list[dict]:
+        rows = self.ativo_repo.listar(texto, apenas_ativas, offset, limit)
+        self.close()
+        return rows
+
+    def criar_ativo(self, ticker: str, nome: str, classe: str, empresa_id):
+        self._unique_ticker(ticker)
+        if classe not in CLASSES: raise ValidationError(f"Classe inválida. Use uma de {CLASSES}.")
+        if not nome or not nome.strip(): raise ValidationError("Nome é obrigatório.")
+        emp_id = self._empresa_optional(empresa_id)
+        ativo =  self.ativo_repo.criar(ticker, nome, classe, emp_id)
+        
+        now = datetime.now().strftime("%Y-%m-%d")
+        self.evento_repo.criar(
+            {
+                "tipo": "ativo",
+                "entidade_id": ativo,
+                "evento": "criacao",
+                "ticker_antigo": None,
+                "ticker_novo": ticker,
+                "data_ex": now,
+                "observacoes": f"Ativo '{ticker}' criado.",
+            }
+        )
+        
+        self.dispose()
+        return ativo
+
+    def editar_ativo(self, aid: int, ticker: str, nome: str, classe: str, empresa_id):
+        ativo_atual = self.ativo_repo.get_by_id(aid)
+        if not ativo_atual: 
+            raise ValidationError("Ativo não encontrado.")
+
+        self._unique_ticker(ticker, ignore_id=aid)
+        if classe not in CLASSES: raise ValidationError(f"Classe inválida. Use uma de {CLASSES}.")
+        if not nome or not nome.strip(): raise ValidationError("Nome é obrigatório.")
+        emp_id = self._empresa_optional(empresa_id)
+        self.ativo_repo.editar(aid, ticker, nome, classe, emp_id)
+        
+        if ativo_atual["ticker"] != ticker:
+            now = datetime.now().strftime("%Y-%m-%d")
+            self.evento_repo.criar(
+                {
+                    "tipo": "ativo",
+                    "entidade_id": aid,
+                    "evento": "edicao",
+                    "ticker_antigo": ativo_atual["ticker"],
+                    "ticker_novo": ticker,
+                    "data_ex": now,
+                    "observacoes": f"Ativo '{ticker}' editado.",
+                }
+            )
+        
+        
+        self.dispose()
+        
+    def get_ativo_por_id(self, aid: int) -> dict | None:
+        ativo = self.ativo_repo.get_by_id(aid)
+        self.close()
+        return ativo
+
+    def inativar_ativo(self, aid: int):
+        if not self.ativo_repo.get_by_id(aid): 
+            raise ValidationError("Ativo não encontrado.")
+        self.ativo_repo.inativar(aid)
+        self.dispose()
+
+    def reativar_ativo(self, aid: int):
+        if not self.ativo_repo.get_by_id(aid): 
+            raise ValidationError("Ativo não encontrado.")
+        self.ativo_repo.reativar(aid)
+        self.dispose()
+
+    def close(self):
+            self.ativo_repo.conn.close()
+
+    def dispose(self):
+        self.ativo_repo.conn.commit()
+        self.close()

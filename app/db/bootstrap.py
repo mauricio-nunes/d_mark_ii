@@ -1,5 +1,7 @@
 import os
 from .connection import get_conn
+from ..db.repositories.users_repo import get_user_by_username, create_user
+from ..core.security import hash_password
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), "migrations")
 
@@ -23,8 +25,6 @@ def apply_migrations():
         conn.commit()
 
     # seed admin se não existir
-    from ..db.repositories.users_repo import get_user_by_username, create_user
-    from ..core.security import hash_password
     if get_user_by_username("admin") is None:
         create_user("admin", hash_password("admin"), must_change_password=True)
 

@@ -1,58 +1,101 @@
-from ...db.repositories import empresas_repo as repo
-from ...core.utils import normalize_cnpj
+from ...db.connection import get_conn
+from ...db.repositories.empresas_repo import EmpresasRepo as empresas_repo
+from ...core.utils import normalize_cnpj, valid_cnpj
+
 
 class ValidationError(Exception): ...
 
-def _valid_cnpj(cnpj: str) -> bool:
-    # Algoritmo de validação de CNPJ (DV)
-    c = normalize_cnpj(cnpj)
-    if len(c) != 14 or c == c[0]*14: return False
-    pesos1 = [5,4,3,2,9,8,7,6,5,4,3,2]
-    pesos2 = [6] + pesos1
-    soma = sum(int(d)*p for d,p in zip(c[:12], pesos1))
-    dv1 = (soma % 11); dv1 = 0 if dv1 < 2 else 11 - dv1
-    soma = sum(int(d)*p for d,p in zip(c[:13], pesos2))
-    dv2 = (soma % 11); dv2 = 0 if dv2 < 2 else 11 - dv2
-    return c[-2:] == f"{dv1}{dv2}"
 
-def _check_unique_cnpj(cnpj: str, ignore_id: int | None = None):
-    c = normalize_cnpj(cnpj)
-    if not _valid_cnpj(c): raise ValidationError("CNPJ inválido.")
-    found = repo.get_by_cnpj(c)
-    if found and (ignore_id is None or found["id"] != ignore_id):
-        raise ValidationError("Já existe empresa com este CNPJ.")
-    return c
+class EmpresasService:
+    def __init__(self):
+        self.empresa_repo = empresas_repo(get_conn())
 
-def _check_unique_codigo_cvm(codigo_cvm: str, ignore_id: int | None = None):
-    found = repo.get_by_codigo_cvm(codigo_cvm)
-    if found and (ignore_id is None or found["id"] != ignore_id):
-        raise ValidationError("Já existe uma empresa com este Código CVM.")
-    return codigo_cvm
+    def _check_unique_cnpj(self, cnpj: str, ignore_id: int | None = None):
+        c = normalize_cnpj(cnpj)
+        if not valid_cnpj(c):
+            raise ValidationError("CNPJ inválido.")
+        found = self.empresa_repo.get_by_cnpj(c)
+        if found and (ignore_id is None or found["id"] != ignore_id):
+            raise ValidationError("Já existe empresa com este CNPJ.")
+        return c
 
-def criar(**data) -> int:
-    cnpj = _check_unique_cnpj(data.get("cnpj",""))
-    if not data.get("razao_social"): raise ValidationError("Razão social é obrigatória.")
-    if not data.get("codigo_cvm"): raise ValidationError("Código CVM é obrigatório.")
-    cvm = _check_unique_codigo_cvm(data.get("codigo_cvm",""))
-    tipo = (data.get("tipo_empresa") or "").strip()
-    if tipo not in ("Fundo","CiaAberta"): raise ValidationError("tipo_empresa deve ser Fundo ou CiaAberta.")
-    data["cnpj"] = cnpj
-    data["codigo_cvm"] = cvm
-    return repo.create(**data)
+    # def _check_unique_codigo_cvm(codigo_cvm: str, ignore_id: int | None = None):
+    #     found = empresas_repo.get_by_codigo_cvm(codigo_cvm)
+    #     if found and (ignore_id is None or found["id"] != ignore_id):
+    #         raise ValidationError("Já existe uma empresa com este Código CVM.")
+    #     return codigo_cvm
 
-def editar(eid: int, **data):
-    reg = repo.get_by_id(eid)
-    if not reg: raise ValidationError("Empresa não encontrada.")
-    cnpj = _check_unique_cnpj(data.get("cnpj", reg["cnpj"]), ignore_id=eid)  # mantém CNPJ se vier igual
-    tipo = (data.get("tipo_empresa") or reg["tipo_empresa"]).strip()
-    if tipo not in ("Fundo","CiaAberta"): raise ValidationError("tipo_empresa deve ser Fundo ou CiaAberta.")
-    data["cnpj"] = cnpj; data["tipo_empresa"] = tipo
-    repo.update(eid, **data)
+    def criar_empresa(self, **data) -> int:
 
-def inativar(eid: int):
-    if not repo.get_by_id(eid): raise ValidationError("Empresa não encontrada.")
-    repo.inativar(eid)
+        if not data.get("cnpj"):
+            raise ValidationError("CNPJ é obrigatório.")
+        if not data.get("razao_social"):
+            raise ValidationError("Razão social é obrigatória.")
+        tipo = (data.get("tipo_empresa") or "").strip()
+        if tipo not in ("Fundo", "CiaAberta"):
+            raise ValidationError("tipo_empresa deve ser Fundo ou CiaAberta.")
 
-def reativar(eid: int):
-    if not repo.get_by_id(eid): raise ValidationError("Empresa não encontrada.")
-    repo.reativar(eid)
+        cnpj = self._check_unique_cnpj(data.get("cnpj", ""))
+        data["cnpj"] = cnpj
+        eid = self.empresa_repo.criar(**data)
+        self.dispose()
+        return eid
+
+    def editar_empresa(self, eid: int, **data):
+
+        reg = self.empresa_repo.get_by_id(eid)
+        if not reg:
+            raise ValidationError("Empresa não encontrada.")
+        cnpj = self._check_unique_cnpj(
+            data.get("cnpj", reg["cnpj"]), ignore_id=eid
+        )  # mantém CNPJ se vier igual
+        tipo = (data.get("tipo_empresa") or reg["tipo_empresa"]).strip()
+        if tipo not in ("Fundo", "CiaAberta"):
+            raise ValidationError("tipo_empresa deve ser Fundo ou CiaAberta.")
+        data["cnpj"] = cnpj
+        data["tipo_empresa"] = tipo
+        self.empresa_repo.editar(eid, **data)
+        self.dispose()
+
+    def inativar_empresa(self, eid: int):
+
+        if not self.empresa_repo.get_by_id(eid):
+            raise ValidationError("Empresa não encontrada.")
+
+        self.empresa_repo.inativar(eid)
+        self.dispose()
+
+    def reativar_empresa(self, eid: int):
+        if not self.empresa_repo.get_by_id(eid):
+            raise ValidationError("Empresa não encontrada.")
+
+        self.empresa_repo.reativar(eid)
+        self.dispose()
+
+    def contar_empresas(self, filtro: str = "", apenas_ativas: bool = True) -> int:
+        count = self.empresa_repo.contar(filtro, apenas_ativas)
+        self.close()
+        return count
+
+    def listar_empresas(
+        self,
+        filtro: str = "",
+        apenas_ativas: bool = True,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> list[dict]:
+        rows = self.empresa_repo.listar(filtro, apenas_ativas, offset, limit)
+        self.close()
+        return rows
+
+    def get_empresa_por_id(self, eid: int) -> dict | None:
+        empresa = self.empresa_repo.get_by_id(eid)
+        self.close()
+        return empresa
+
+    def close(self):
+        self.empresa_repo.conn.close()
+
+    def dispose(self):
+        self.empresa_repo.conn.commit()
+        self.close()

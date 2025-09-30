@@ -3,16 +3,17 @@ from ..widgets import title, divider, pause, confirm
 from ..prompts import prompt_menu_choice
 from ...core.utils import clear_screen
 from ...core.pagination import Paginator
-from ...db.repositories import ativos_repo as repo
-from ...db.repositories import empresas_repo
-from ...services.cadastros.ativos_service import ValidationError, CLASSES, criar, editar, inativar, reativar
+from ...services.cadastros.ativos_service import (
+    AtivosService as ativos_service,
+    ValidationError,
+    CLASSES)
 
 def _input(t): return input(Fore.WHITE + t + Style.RESET_ALL)
 
 def _header():
     title("Cadastro de Ativos")
-    print(f"Classes válidas: {', '.join(CLASSES)}")
-    print("Comandos: [N] Próx.  [P] Ant.  [G] Ir pág.  [F] Filtrar  [I] Incluir  [E] Editar  [X] Inativar  [R] Reativar  [Q] Voltar")
+    print("Comandos:  [I] Incluir [E] Editar [X] Inativar   [R] Reativar [F] Filtrar")
+    print("Navegação: [N] Próx.   [P] Ant.   [G] Ir p/ pág. [Q] Voltar")
     divider()
 
 def _render(rows, page, pages, total, filtro, apenas_ativos):
@@ -34,19 +35,15 @@ def _coleta_campos(reg=None):
         except: empresa_id = None
     return {"ticker": ticker, "nome": nome, "classe": classe, "empresa_id": empresa_id}
 
-def _listar_empresas_pequeno():
-    rows = empresas_repo.list("", True, 0, 10)
-    print(Fore.MAGENTA + "Algumas empresas (use o ID):" + Style.RESET_ALL)
-    for r in rows:
-        print(f"  {r['id']:>3} - {r['razao_social']} ({r['cnpj']})")
 
 def tela_ativos():
     filtro, apenas_ativos = "", True
-    total = repo.count(filtro, apenas_ativos); pager = Paginator(total)
+    total = ativos_service().contar_ativos(filtro, apenas_ativos)
+    pager = Paginator(total)
     while True:
         clear_screen(); _header()
         start, _ = pager.range()
-        rows = repo.list(filtro, apenas_ativos, start, pager.page_size)
+        rows = ativos_service().listar_ativos(filtro, apenas_ativos, start, pager.page_size)
         _render(rows, pager.page, pager.pages, pager.total, filtro, apenas_ativos)
         ch = prompt_menu_choice("Selecione: ").strip().lower()
         if ch in ("q","voltar"): break
@@ -59,39 +56,46 @@ def tela_ativos():
             filtro = _input("Texto (ticker/nome) [ENTER limpa]: ")
             ap = _input("Somente ativos? (S/N) [S]: ").lower()
             apenas_ativos = False if ap in ("n","nao","não") else True
-            total = repo.count(filtro,apenas_ativos); pager = Paginator(total)
+            total = ativos_service().contar_ativos(filtro, apenas_ativos); pager = Paginator(total)
         elif ch=="i":
-            _listar_empresas_pequeno()
+            #_listar_empresas_pequeno()
             data = _coleta_campos()
             try:
                 if confirm("Confirmar inclusão? (S/N) "):
-                    criar(**data); print("Incluído.")
-                    total = repo.count(filtro,apenas_ativos); pager = Paginator(total)
+                    ativos_service().criar_ativo(**data); print("Incluído.")
+                    total = ativos_service().contar_ativos(filtro, apenas_ativos)
+                    pager = Paginator(total)
             except ValidationError as e: print(f"Erro: {e}")
             pause()
         elif ch=="e":
             try: aid = int(_input("ID: "))
             except: print("ID inválido."); pause(); continue
-            reg = repo.get_by_id(aid)
+            reg = ativos_service().get_ativo_por_id(aid)
             if not reg: print("Não encontrado."); pause(); continue
-            _listar_empresas_pequeno()
+            #_listar_empresas_pequeno()
             data = _coleta_campos(reg)
             try:
-                if confirm("Confirmar alteração? (S/N) "): editar(aid, **data); print("Atualizado.")
+                if confirm("Confirmar alteração? (S/N) "): 
+                    ativos_service().editar_ativo(aid, **data); 
+                    print("Atualizado.")
             except ValidationError as e: print(f"Erro: {e}")
             pause()
         elif ch=="x":
             try: aid = int(_input("ID p/ inativar: "))
             except: print("ID inválido."); pause(); continue
             if confirm("Inativar? (S/N) "):
-                try: inativar(aid); print("Inativado.")
+                try: 
+                    ativos_service().inativar_ativo(aid)
+                    print("Inativado.")
                 except ValidationError as e: print(f"Erro: {e}")
             pause()
         elif ch=="r":
             try: aid = int(_input("ID p/ reativar: "))
             except: print("ID inválido."); pause(); continue
             if confirm("Reativar? (S/N) "):
-                try: reativar(aid); print("Reativado.")
+                try: 
+                    ativos_service().reativar_ativo(aid)
+                    print("Reativado.")
                 except ValidationError as e: print(f"Erro: {e}")
             pause()
         else:

@@ -30,16 +30,15 @@ Aqui está o **copilot-instructions** atualizado com as diretivas de arquitetura
 Use the current layered architecture and keep dependencies **one-directional**:
 
 * **ui/** (CLI & presentation): argparse/typer handlers, formatting, user prompts.
-
   * Calls **services** only. **No DB or network** logic here.
+
 * **services/** (business logic/use cases): portfolio math, PM/FIFO, validation, orchestration.
-
   * Calls **repositories** and **core**.
+
 * **repositories/** (data access & gateways): SQLite DAOs, file loaders, HTTP clients.
-
   * No formatting, no CLI text. Use **parameterized SQL** only.
-* **core/** (domain & utilities): entities, value objects, enums, errors, date/money utils.
 
+* **core/** (domain & utilities): entities, value objects, enums, errors, date/money utils.
   * **No imports from other layers.**
 
 **Rules**
@@ -81,6 +80,7 @@ app/
 
   * **tabulate** for tabular output (e.g., `tablefmt='fancy_grid'` or `github` when copying).
   * **colorama** for highlights (headers, totals, gains/losses).
+
 * Keep all **formatting in `ui/`** (no colors/tables in services or repositories).
 * Provide helpers in `ui/formatters.py`:
 

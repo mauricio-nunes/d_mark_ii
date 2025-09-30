@@ -9,6 +9,7 @@ from .importacao.menu import importacao_loop
 from .consultas.menu import consultas_loop
 from .backup.menu import backup_loop      
 from .config.menu import config_loop   
+from .processamento.menu import processamento_loop
 
 MAIN_ITEMS = [
     "Cadastros",
@@ -18,13 +19,17 @@ MAIN_ITEMS = [
     "Consultas",
     "Backup/Restore",
     "Configurações",
+    "Consolidação & Processamento",
     "Sair"
 ]
 
 def show_main_menu():
     title("Menu Principal")
     for i, item in enumerate(MAIN_ITEMS, start=1):
-        num = 9 if item == "Sair" else i
+        if item == "Sair":
+            num = 0
+        else:
+            num = i
         print(Fore.WHITE + f"{num}. {item}" + Style.RESET_ALL)
     divider()
 
@@ -53,7 +58,10 @@ def handle_main_choice(choice: str) -> bool:
         case "7":
             config_loop()
             pause()
-        case "9" | "q" | "sair" | "exit":
+        case "8":
+            processamento_loop()
+            pause()
+        case "0" | "q" | "sair" | "exit":
             return False
         case _:
             print("Opção inválida.")

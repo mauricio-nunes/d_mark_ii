@@ -4,7 +4,7 @@ import tempfile
 import zipfile
 from tqdm import tqdm
 import csv
-from ...core.utils import normalize_cnpj
+from ...core.utils import normalize_cnpj,parse_date
 from ...db.repositories.empresas_repo import EmpresasRepo as empresas_repo
 from ...db.connection import get_conn
 import sys
@@ -117,13 +117,13 @@ class EmpresasService:
             # csv_cias_abertas = self.download_cias_abertas_cvm()
             # csv_fundos = self.download_fundos_cvm()
             
-            i_e, a_e, ig_e, err_e = self._cias_abertas(csv_cias_abertas,total_cias_abertas)
-            i_f, a_f, ig_f, err_f = self._fundos(csv_fundos,total_fundos)
+            i_e,  ig_e, err_e = self._cias_abertas(csv_cias_abertas,total_cias_abertas)
+            i_f,  ig_f, err_f = self._fundos(csv_fundos,total_fundos)
             
             self.empresas_repo.conn.commit()
             self.empresas_repo.conn.close()
             
-            return i_e + i_f, a_e + a_f, ig_e + ig_f, err_e + err_f
+            return i_e + i_f, ig_e + ig_f, err_e + err_f
         
         finally:
             # Cleanup temp files
@@ -152,47 +152,90 @@ class EmpresasService:
             with tqdm(total=total_linhas, desc="Processando empresas", unit="empresas") as pbar:
                 for row in reader:
                     try:
-                            # Extract and normalize data
-                        cnpj = normalize_cnpj(row.get("CNPJ_CIA", ""))
-                        if not cnpj:
-                             errors += 1
-                             pbar.update(1)
-                             continue
-                            
-                        razao_social = row.get("DENOM_SOCIAL", "").strip()
-                        if not razao_social:
-                            errors += 1
+                        #FILTROS
+                        if row.get("TP_MERC", "").strip() != "BOLSA":  # Skip non-listed companies
+                            ignorado += 1
                             pbar.update(1)
                             continue
                             
+                        
+                        #CNPJ
+                        cnpj = normalize_cnpj(row.get("CNPJ_CIA", ""))
+                        if not cnpj:
+                             erros += 1
+                             pbar.update(1)
+                             continue
+                        
+                        #RAZAO SOCIAL
+                        razao_social = row.get("DENOM_SOCIAL", "").strip()
+                        if not razao_social:
+                            erros += 1
+                            pbar.update(1)
+                            continue
+                        
+                        # SETOR ATIVIDADE
                         setor_atividade = row.get("SETOR_ATIV", "").strip() or None
+                        if setor_atividade == "":
+                            setor_atividade = None
+                        
+                        #TIPO EMPRESA
+                        tipo_empresa = "CiaAberta"
+                        
+                        # CODIGO CVM
+                        codigo_cvm = row.get("CD_CVM", "").strip() or None
+                        if codigo_cvm == "":
+                            codigo_cvm = None
+                        else:
+                            codigo_cvm = int(codigo_cvm)
+
+                        
+                        # SITUACAO EMISSOR
+                        situacao_emissor = row.get("SIT_EMISSOR", "").strip() or None
+                        if situacao_emissor == "":
+                            situacao_emissor = None
+                        
+                        # CONTROLE ACIONARIO
+                        controle_acionario = row.get("CONTROLE_ACIONARIO", "").strip() or None
+                        if controle_acionario == "":
+                            controle_acionario = None
+                        
+                        
+                        #DATA CONSTITUICAO
+                        data_constituicao = row.get("DT_CONST", "").strip() or None
+                        if data_constituicao == "":
+                            data_constituicao = None
+                        else:
+                            data_constituicao = parse_date(data_constituicao)  # Valida formato
+                        
+                        #ATIVO
                         situacao = row.get("SIT", "").strip() or None
-                            
-                        # Set ativo based on situacao
                         ativo = 1 if situacao == "ATIVO" else 0
+                        
+                      
+                       
                             
                         # Upsert company
                         was_inserted = self.empresas_repo.upsert_por_cnpj(
                             cnpj=cnpj,
                             razao_social=razao_social,
                             setor_atividade=setor_atividade,
-                            tipo_empresa="CiaAberta",
-                            situacao=ativo,
+                            tipo_empresa=tipo_empresa,
+                            codigo_cvm=codigo_cvm,
+                            situacao_emissor=situacao_emissor,
+                            controle_acionario=controle_acionario,
+                            data_constituicao=data_constituicao,
+                            ativo=ativo
                         )
 
-                        if was_inserted == 1:
+                        if was_inserted > 1:
                             inserido += 1
-                        elif was_inserted == 2:
-                            atualizado += 1
-                        else:
-                            ignorado += 1
 
                     except Exception as e:
                             erros += 1
                         
                     pbar.update(1)
             
-        return inserido, atualizado, ignorado, erros
+        return inserido, ignorado, erros
     
     def _fundos(self, csv_fundos,total_linhas) -> tuple[int, int, int, int]:
 
@@ -204,52 +247,78 @@ class EmpresasService:
             with tqdm(total=total_linhas, desc="Processando fundos", unit="fundos") as pbar:
                 for row in reader:
                     try:
-                            
-                            # Extract and normalize data
+                        
+                        #FILTROS
+                        if row.get("Tipo_Fundo", "").strip() != "FII":  # Skip all other funds
+                            ignorado += 1
+                            pbar.update(1)  
+                            continue
+
+                        # CNPJ
                         cnpj = normalize_cnpj(row.get("CNPJ_Fundo", "").strip())
                         if not cnpj:
-                             errors += 1
+                             erros += 1
                              pbar.update(1)
                              continue
                          
-                        if cnpj == "35864448000138": 
-                            a =1
-                            
+                        # RAZAO SOCIAL                            
                         razao_social = row.get("Denominacao_Social", "").strip()
                         if not razao_social:
-                            errors += 1
+                            erros += 1
                             pbar.update(1)
                             continue
+                        
+                        #SETOR ATIVIDADE
+                        setor_atividade = None  # Não disponível no CSV de fundos
+                        
+                        #TIPO EMPRESA
+                        tipo_empresa = "Fundo"
+                        
+                        #CODIGO CVM
+                        codigo_cvm = row.get("Codigo_CVM", "").strip() or None
+                        if codigo_cvm == "":
+                            codigo_cvm = None
+                        else:
+                            codigo_cvm = int(codigo_cvm)
+                        
+                        #SITUACAO EMISSOR
+                        situacao_emissor = row.get("Situacao", "").strip() or None
+                        
+                        #CONTROLE ACIONARIO
+                        controle_acionario = None  # Não aplicável para fundos
+                        
+                        #DATA CONSTITUICAO
+                        data_constituicao = row.get("Data_Constituicao", "").strip() or None
+                        if data_constituicao == "":
+                            data_constituicao = None
+                        else:
+                            data_constituicao = parse_date(data_constituicao)  # Valida formato
                             
-                        
-                        situacao = row.get("Situacao", "").strip() or None
-                        
-                        tipo_fundo = row.get("Tipo_Fundo", "").strip() or None
                             
                         # Set ativo based on situacao
-                        ativo = 1 if situacao == "Em Funcionamento Normal" else 0
+                        ativo = 0 if situacao_emissor == "Cancelado" else 1
                             
                         # Upsert company
                         was_inserted = self.empresas_repo.upsert_por_cnpj(
                             cnpj=cnpj,
                             razao_social=razao_social,
-                            setor_atividade=tipo_fundo,
-                            tipo_empresa="Fundo",
-                            situacao=ativo,
+                            setor_atividade=setor_atividade,
+                            tipo_empresa=tipo_empresa,
+                            codigo_cvm=codigo_cvm,
+                            situacao_emissor=situacao_emissor,
+                            controle_acionario=controle_acionario,
+                            data_constituicao=data_constituicao,
+                            ativo=ativo,
                         )
 
-                        if was_inserted == 1:
+                        if was_inserted > 1:
                             inserido += 1
-                        elif was_inserted == 2:
-                            atualizado += 1
-                        else:
-                            ignorado += 1
 
                     except Exception as e:
                             erros += 1
                         
                     pbar.update(1)
             
-        return inserido, atualizado, ignorado, erros
+        return inserido, ignorado, erros
             
        

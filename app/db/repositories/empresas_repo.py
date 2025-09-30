@@ -114,12 +114,15 @@ class EmpresasRepo:
         
         cur.execute(
             """
-            INSERT INTO empresas(cnpj, razao_social, setor_atividade,
-                                tipo_empresa, ativo)
-            VALUES (?, ?, ?, ?, ?) ON CONFLICT(cnpj) DO UPDATE SET
+            INSERT INTO empresas(cnpj, razao_social, setor_atividade,tipo_empresa,codigo_cvm,situacao_emissor,controle_acionario,data_constituicao, ativo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(cnpj) DO UPDATE SET
                 razao_social=excluded.razao_social,
                 setor_atividade=excluded.setor_atividade,
                 tipo_empresa=excluded.tipo_empresa,
+                codigo_cvm=excluded.codigo_cvm,
+                situacao_emissor=excluded.situacao_emissor,
+                controle_acionario=excluded.controle_acionario,
+                data_constituicao=excluded.data_constituicao,
                 ativo=excluded.ativo,
                 atualizado_em=datetime('now');
         """,
@@ -128,7 +131,11 @@ class EmpresasRepo:
                 kwargs["razao_social"],
                 kwargs["setor_atividade"],
                 kwargs["tipo_empresa"],
-                kwargs["situacao"]
+                kwargs["codigo_cvm"],
+                kwargs["situacao_emissor"],
+                kwargs["controle_acionario"],
+                kwargs["data_constituicao"],
+                kwargs["ativo"]
             ),
         )
         nid = cur.lastrowid

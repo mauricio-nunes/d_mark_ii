@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS empresas (
   razao_social TEXT NOT NULL,
   setor_atividade TEXT,
   tipo_empresa TEXT NOT NULL, -- 'Fundo' | 'CiaAberta'
+  codigo_cvm INT, -- código CVM
+  situacao_emissor TEXT,
+  controle_acionario TEXT,
+  data_constituicao TEXT, -- ISO date
   ativo INTEGER NOT NULL DEFAULT 1,
   criado_em TEXT NOT NULL DEFAULT (datetime('now')),
   atualizado_em TEXT NOT NULL DEFAULT (datetime('now'))

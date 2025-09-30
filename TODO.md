@@ -4,9 +4,9 @@ This template outlines the key areas for implementation in the D Mark II project
 
 ## Features to Implement
 
-- [X] Feature 1: Cadastro de Corretoras
-- [X] Feature 2: Cadastro de Carteiras
-- [X] Feature 3: Cadastro de Empresas
+- [X] Feature 1: Importação de FCA
+- [X] Feature 2: Importação de ITR
+- [X] Feature 3: Importação de DFP
 - [X] Feature 4: Cadastro de Ativos
 - [ ] Feature 5: Fazer um importação incial de dados (Empresas , Fundos e Ativos). 
 

@@ -1,21 +1,22 @@
-Aqui está o **copilot-instructions** atualizado com as diretivas de arquitetura e o uso de **tabulate** e **colorama** para relatórios:
+# Copilot Instructions — D Mark II
 
----
+## Project Overview
 
-# Copilot Instructions — D Mark I
-
-## Project
-
-* **Name**: D Mark I
+* **Name**: D Mark II
 * **Type**: CLI for tracking and analyzing investments in **Stocks** and **REITs (FIIs)**
-* **Language**: Python with **SQLite**
-* **Integrations**: external APIs + CVM file downloads (CSV/XLSX)
+* **Language**: Python 3.11+ with **SQLite**
+* **Domain**: Brazilian financial market (CVM, B3 integrations)
+* **Data Sources**: CVM APIs, B3 files, manual imports (CSV/XLSX)
+* **Key Features**: FCA/ITR/DFP imports, portfolio tracking, financial analysis, user authentication
 
 ## Goals for Copilot
 
 * Generate/refactor **Python CLI** code (data parsing, calculations, imports, downloads).
-* Suggest proper **error handling**, **timeouts**, **retries**, and clear **logging**.
-* Assist with **GitHub Issues**, **commits**, and **PR reviews**.
+* Implement **Brazilian financial market** specific logic (CNPJ validation, CVM formats, B3 standards).
+* Suggest proper **error handling**, **timeouts**, **retries**, and **progress indicators** (tqdm).
+* Assist with **database migrations**, **SQLite optimizations**, and **data integrity**.
+* Help with **GitHub Issues**, **commit messages**, and **PR reviews**.
+* Focus on **user experience** with clear Portuguese messages and intuitive workflows.
 
 ## Style
 
@@ -48,31 +49,59 @@ Use the current layered architecture and keep dependencies **one-directional**:
 * Prefer `typing.Protocol` for repository/service interfaces.
 * Keep functions short; push branching to services; keep repositories thin.
 
-**Suggested folders**
+**Current folder structure**
 
 ```
 app/
 	ui/
+		backup/           # backup UI flows
+		importacao/       # import UI flows
+		widgets.py        # common UI components (header, pause, confirm)
+		prompts.py        # input helpers (username, password)
+		splash.py         # startup screen with pyfiglet
+		menu.py           # main navigation loops
 	services/
+		importacao/       # CVM import services (FCA, ITR, DFP)
+		auth_service.py   # login flow, password validation
+		backup_service.py # backup/restore operations
+		config_service.py # user preferences management
 	db/
-   repositories/
-   migrations/
+		connection.py     # SQLite connection factory
+		bootstrap.py      # migrations runner + admin user seed
+		repositories/
+			importacao/   # CVM data repositories
+			usuarios/     # user management repositories
+		migrations/       # SQL migration files (####_description.sql)
 	core/
-		__init__.py  # domain models, errors, utils
+		__init__.py       # domain models, errors, utils
+		formatters.py     # tabulate/colorama helpers
+		security.py       # bcrypt password hashing
+		paths.py          # directory constants (DATA_DIR, BACKUP_DIR)
+		utils.py          # CNPJ validation, date parsing, URL validation
+		decimal_ctx.py    # precise money calculations with Decimal
+		xlsx.py           # Excel file readers using openpyxl
 ```
+
+
 
 ## Database (SQLite)
 
 * Use **parameters** in queries, never string interpolation.
-* Ensure migrations/checks before creating tables.
+* Follow migration pattern: `app/db/migrations/####_description.sql` with version control in `_migrations` table.
 * Always close cursors/connections.
+* Use `sqlite3.Row` factory for dict-like access to results.
+* Implement upsert patterns for CVM data with duplicate handling.
+* Repository pattern: one repo per domain entity (e.g., `CiaAbertaFcaRepo`, `UsuarioRepo`).
 
 ## Networking & I/O
 
-* Validate **HTTP status**, **content-type**, **file size** when downloading.
-* Handle **encoding** (UTF-8 + fallback).
-* Normalize dates (`yyyy-mm-dd` or `dd/mm/yyyy`).
+* Validate **HTTP status**, **content-type**, **file size** when downloading CVM/B3 files.
+* Handle **encoding** (UTF-8 + fallback to latin1 for CVM CSV files).
+* Normalize dates (`yyyy-mm-dd` format internally) and CNPJ (14 digits with validation).
 * Use **timeouts + retry with jitter** in API calls.
+* Implement **progress bars** with `tqdm` for long-running imports.
+* Clean up **temporary files** after ZIP extraction.
+* Handle **CSV delimiters** correctly (`;` for CVM, `,` for B3).
 
 ## UI & Reports (tabulate + colorama)
 
@@ -90,6 +119,38 @@ app/
 * Always include totals/summary rows where applicable.
 * All CLI messages and labels **in PT-BR**.
 
+## Domain-Specific Patterns
+
+* **CNPJ handling**: Use `normalize_cnpj()` and `valid_cnpj()` from `core/utils.py`.
+* **Date parsing**: Use `parse_date()` to convert CVM dates to ISO format.
+* **URL validation**: Use `validate_url()` and `parse_url()` for web addresses.
+* **Money calculations**: Use `decimal_ctx.py` with `money()` and `qty()` for precision.
+* **CVM imports**: Follow consolidation pattern (latest document_id wins per CNPJ).
+* **Progress tracking**: Use `tqdm` for all long-running operations.
+
+## Authentication & Security
+
+* User login with **bcrypt** password hashing.
+* Account lockout after 5 failed attempts.
+* Force password change on first login.
+* Environment variables for sensitive configuration.
+* Input validation for all user data.
+
+## Error Handling
+
+* Use custom `ValidationError` for business rule violations.
+* Handle network timeouts gracefully with user-friendly messages.
+* Provide detailed error reports for import failures.
+* Log errors but show clean messages to users in Portuguese.
+
+## Testing Considerations
+
+* Mock HTTP calls in service tests.
+* Use temporary databases for repository tests.
+* Test CNPJ validation edge cases.
+* Verify CSV parsing with malformed data.
+* Test authentication flows and lockout scenarios.
+
 ## Commits & PRs
 
 * Commit types: `feature`, `bug`, `chore`, `spike`.
@@ -103,6 +164,9 @@ app/
   * [ ] No secrets committed
   * [ ] Respects **UI/Services/Repositories/Core** layering
   * [ ] Tables use **tabulate**; colors via **colorama** in `ui/`
+  * [ ] CNPJ validation implemented where needed
+  * [ ] Progress bars for long operations
+  * [ ] Portuguese messages for users
 
 ## Code Review focus
 
@@ -113,11 +177,23 @@ app/
 * Normalize dates and currency explicitly.
 * Validate architecture boundaries (no UI in services; no DB in UI).
 * Ensure reports use `ui/formatters` with **tabulate** and **colorama**.
+* Verify CNPJ normalization and validation.
+* Check for proper error handling in imports.
+
+## Environment Setup
+
+* Python 3.11+ required.
+* Dependencies: see `requirements.txt` (bcrypt, colorama, pyfiglet, pandas, openpyxl, tabulate, requests, tqdm).
+* Environment variables via `.env` file (see `.env.example`).
+* SQLite database auto-created on first run.
+* Default admin user: `admin/admin` (must change on first login).
 
 ## Security
 
 * Never expose secrets.
 * Recommend **environment variables** for credentials.
 * Validate/sanitize CLI user input.
+* Use parameterized SQL queries only.
+* Hash passwords with bcrypt + salt.
 
 ---

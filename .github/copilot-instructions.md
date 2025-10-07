@@ -106,12 +106,12 @@ app/
 * Clean up **temporary files** after ZIP extraction.
 * Handle **CSV delimiters** correctly (`;` for CVM, `,` for B3).
 
-## UI & Reports (tabulate + colorama)
+## UI & Reports
 
-* Tables/reports **must** use:
+* Tables/reports:
 
-  * **tabulate** for tabular output (e.g., `tablefmt='fancy_grid'` or `github` when copying).
-  * **colorama** for highlights (headers, totals, gains/losses).
+	* The preferred library for UI formatting is now **Rich**.  
+	* Older code using `tabulate` and `colorama` remains supported but should be gradually migrated.
 
 * Keep all **formatting em `core/formatters.py`** (centralizado).
 * Helpers disponíveis em `core/formatters.py`:
@@ -162,7 +162,7 @@ app/
 * Commit types: `feature`, `bug`, `chore`, `spike`.
 * Format: `<type> : short description`
 
-  * Ex: `feature : import monthly CVM positions`
+	* Ex: `feature : import monthly CVM positions`
 * PR checklist:
 
   * [ ] Tested CLI locally

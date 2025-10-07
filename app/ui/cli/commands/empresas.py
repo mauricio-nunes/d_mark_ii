@@ -51,9 +51,6 @@ class EmpresasConfigCrudCommand(BaseCrudCommand):
 		self.app.command(name="editar")(self.editar)
 		self.app.command(name="excluir")(self.excluir)
 	
-	def _render_list(self, registros: List[Dict[str, Any]]):  # pragma: no cover - não utilizado neste CRUD
-		"""(Não utilizado) Listagem completa foi desativada para este comando especializado."""
-		pass
 	
 	def _render_single(self, registro: Dict[str, Any]):
 		"""Renderiza empresa única (resumo)."""

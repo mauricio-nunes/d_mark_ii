@@ -85,8 +85,7 @@ class EmpresasConfigCrudCommand(BaseCrudCommand):
 	
 	def _collect_create_data(self) -> Optional[Dict[str, Any]]:
 		"""Coleta dados para criação de empresa."""
-		if not Confirm.ask("Deseja criar uma nova empresa?"):
-			return None
+		
 		
 		cnpj = Prompt.ask("CNPJ (com ou sem formatação)")
 		codigo_negociacao = Prompt.ask("Código de negociação")

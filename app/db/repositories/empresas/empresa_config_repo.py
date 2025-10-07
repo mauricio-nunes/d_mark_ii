@@ -83,43 +83,31 @@ class EmpresaConfigRepo:
 
 	def atualizar(self, id: int, dados: Dict[str, Any]) -> Dict[str, Any]:
 		"""Atualiza configuração de empresa existente."""
-		campos_para_atualizar = []
+		# Predefined mapping of allowed fields and their processing functions
+		allowed_fields = {
+			'cnpj': lambda v: normalize_cnpj(v),
+			'codigo_negociacao': lambda v: v.upper(),
+			'classificacao': lambda v: v,
+			'tipo_dfp': lambda v: v,
+			'modo_analise': lambda v: v,
+		}
+		set_clauses = []
 		valores = []
-		
-		if 'cnpj' in dados:
-			campos_para_atualizar.append('cnpj = ?')
-			valores.append(normalize_cnpj(dados['cnpj']))
-		
-		if 'codigo_negociacao' in dados:
-			campos_para_atualizar.append('codigo_negociacao = ?')
-			valores.append(dados['codigo_negociacao'].upper())
-		
-		if 'classificacao' in dados:
-			campos_para_atualizar.append('classificacao = ?')
-			valores.append(dados['classificacao'])
-		
-		if 'tipo_dfp' in dados:
-			campos_para_atualizar.append('tipo_dfp = ?')
-			valores.append(dados['tipo_dfp'])
-		
-		if 'modo_analise' in dados:
-			campos_para_atualizar.append('modo_analise = ?')
-			valores.append(dados['modo_analise'])
-
-		if not campos_para_atualizar:
+		for key, process in allowed_fields.items():
+			if key in dados:
+				set_clauses.append(f"{key} = ?")
+				valores.append(process(dados[key]))
+		if not set_clauses:
 			return self.obter_por_id(id)
-		
 		valores.append(id)
-		
 		cur = self.conn.cursor()
-		cur.execute(f"""
-			UPDATE empresas_config 
-			SET {', '.join(campos_para_atualizar)}
-			WHERE id = ?
-		""", valores)
-		
+		sql = (
+			"UPDATE empresas_config "
+			"SET " + ", ".join(set_clauses) +
+			" WHERE id = ?"
+		)
+		cur.execute(sql, valores)
 		self.conn.commit()
-		
 		return self.obter_por_id(id)
 
 	def excluir(self, id: int) -> bool:

@@ -8,20 +8,20 @@ from .backup.menu import backup_loop
 
 
 MAIN_ITEMS = [
-    "Importação",
-    "Database - Backup/Restore",
-    "Manutenção de Cadastros",
-    "Sair"
+    'Importação',
+    'Database - Backup/Restore',
+    'Manutenção de Cadastros',
+    'Sair'
 ]
 
 def show_main_menu():
-    title("Menu Principal")
+    title('Menu Principal')
     for i, item in enumerate(MAIN_ITEMS, start=1):
-        if item == "Sair":
+        if item == 'Sair':
             num = 0
         else:
             num = i
-        print(Fore.WHITE + f"{num}. {item}" + Style.RESET_ALL)
+        print(Fore.WHITE + f'{num}. {item}' + Style.RESET_ALL)
     divider()
 
 def handle_main_choice(choice: str) -> bool:
@@ -29,20 +29,20 @@ def handle_main_choice(choice: str) -> bool:
     Retorna True para continuar no app, False para sair.
     """
     match choice.lower():
-        case "1":
+        case '1':
             importacao_loop()
             pause()
-        case "2":
+        case '2':
             backup_loop()
             pause()
-        case "3":
+        case '3':
             from .empresas.menu import manutencao_cadastros_menu
             manutencao_cadastros_menu()
             pause()
-        case "0" | "q" | "sair" | "exit":
+        case '0' | 'q' | 'sair' | 'exit':
             return False
         case _:
-            print("Opção inválida.")
+            print('Opção inválida.')
             pause()
     return True
 

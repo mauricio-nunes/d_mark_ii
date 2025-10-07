@@ -3,19 +3,19 @@ from ...connection import get_conn
 
 
 class CiaAbertaItrRepo:
-    """Repository para as tabelas de Itr."""
-    
-    def __init__(self, conn=None):
-        self.conn = conn or get_conn()
-    
-    def insert_itr_controle(self, **kwargs) -> tuple[int, str]:
-        """
+	"""Repository para as tabelas de Itr."""
+	
+	def __init__(self, conn=None):
+		self.conn = conn or get_conn()
+	
+	def insert_itr_controle(self, **kwargs) -> tuple[int, str]:
+		"""
 		Retorna (affected_rows, action) onde action = 'inserted'|'updated'|'ignored'
 		"""
-        cur = self.conn.cursor()
+		cur = self.conn.cursor()
 		
-        try:
-            cur.execute("""
+		try:
+			cur.execute("""
 				INSERT OR IGNORE INTO cia_aberta_itr_controle (
 					cnpj, data_referencia, versao, razao_social, codigo_cvm,
 					categoria_documento, codigo_documento, data_recebimento,
@@ -28,80 +28,80 @@ class CiaAbertaItrRepo:
 				kwargs.get('data_recebimento'), kwargs.get('link_documento'),
 				kwargs['criado_em']
 			))
-            return (cur.rowcount or 0), ('inserted' if cur.rowcount == 1 else 'ignored')
-        
-        except Exception as e:
-			
-            raise e
-    
-    def insert_itr_composicao_capital(self, **kwargs) -> tuple[int, str]:
-        """
-		Retorna (affected_rows, action) onde action = 'inserted'|'updated'|'ignored'
-		"""
-        cur = self.conn.cursor()
+			return (cur.rowcount or 0), ('inserted' if cur.rowcount == 1 else 'ignored')
 		
-        try:
-            cur.execute("""
-                INSERT OR IGNORE INTO cia_aberta_itr_composicao_capital (
-                    cnpj, data_referencia, versao, razao_social,
-                    qtde_acao_ordinaria, qtde_acao_preferencial, qtde_acao_total,
-                    qtde_acao_ordinaria_tesouraria, qtde_acao_preferencial_tesouraria, qtde_acao_total_tesouraria
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                kwargs['cnpj'],
-                kwargs['data_referencia'],
-                kwargs['versao'],
-                kwargs['razao_social'],
-                kwargs['qtde_acao_ordinaria'],
-                kwargs['qtde_acao_preferencial'],
-                kwargs['qtde_acao_total'],
-                kwargs['qtde_acao_ordinaria_tesouraria'],
-                kwargs['qtde_acao_preferencial_tesouraria'],
-                kwargs['qtde_acao_total_tesouraria']
-            ))
-            return (cur.rowcount or 0), ('inserted' if cur.rowcount == 1 else 'ignored')
-        
-        except Exception as e:
-            raise e
-
-    def insert_itr_dre_bal(self, table_name: str, **kwargs) -> tuple[int, str]:
-        """
+		except Exception as e:
+			
+			raise e
+	
+	def insert_itr_composicao_capital(self, **kwargs) -> tuple[int, str]:
+		"""
 		Retorna (affected_rows, action) onde action = 'inserted'|'updated'|'ignored'
 		"""
-        cur = self.conn.cursor()
+		cur = self.conn.cursor()
+		
+		try:
+			cur.execute("""
+				INSERT OR IGNORE INTO cia_aberta_itr_composicao_capital (
+					cnpj, data_referencia, versao, razao_social,
+					qtde_acao_ordinaria, qtde_acao_preferencial, qtde_acao_total,
+					qtde_acao_ordinaria_tesouraria, qtde_acao_preferencial_tesouraria, qtde_acao_total_tesouraria
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			""", (
+				kwargs['cnpj'],
+				kwargs['data_referencia'],
+				kwargs['versao'],
+				kwargs['razao_social'],
+				kwargs['qtde_acao_ordinaria'],
+				kwargs['qtde_acao_preferencial'],
+				kwargs['qtde_acao_total'],
+				kwargs['qtde_acao_ordinaria_tesouraria'],
+				kwargs['qtde_acao_preferencial_tesouraria'],
+				kwargs['qtde_acao_total_tesouraria']
+			))
+			return (cur.rowcount or 0), ('inserted' if cur.rowcount == 1 else 'ignored')
+		
+		except Exception as e:
+			raise e
 
-        try:
-            cur.execute(f"""
-                INSERT OR IGNORE INTO {table_name} (
-                    cnpj, data_referencia, versao, razao_social,
-                    codigo_cvm, grupo, moeda, escala_moeda,
-                    data_inicio_exercicio, data_fim_exercicio,
-                    codigo_conta, descricao_conta, valor_conta,
-                    conta_fixa, criado_em
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                kwargs['cnpj'],
-                kwargs['data_referencia'],
-                kwargs['versao'],
-                kwargs['razao_social'],
-                kwargs['codigo_cvm'],
-                kwargs['grupo'],
-                kwargs['moeda'],
-                kwargs['escala_moeda'],
-                kwargs['data_inicio_exercicio'],
-                kwargs['data_fim_exercicio'],
-                kwargs['codigo_conta'],
-                kwargs['descricao_conta'],
-                kwargs['valor_conta'],
-                kwargs['conta_fixa'],
-                kwargs['criado_em']
-            ))
-            return (cur.rowcount or 0), ('inserted' if cur.rowcount == 1 else 'ignored')
+	def insert_itr_dre_bal(self, table_name: str, **kwargs) -> tuple[int, str]:
+		"""
+		Retorna (affected_rows, action) onde action = 'inserted'|'updated'|'ignored'
+		"""
+		cur = self.conn.cursor()
 
-        except Exception as e:
-            
-            raise e
-        
+		try:
+			cur.execute(f"""
+				INSERT OR IGNORE INTO {table_name} (
+					cnpj, data_referencia, versao, razao_social,
+					codigo_cvm, grupo, moeda, escala_moeda,
+					data_inicio_exercicio, data_fim_exercicio,
+					codigo_conta, descricao_conta, valor_conta,
+					conta_fixa, criado_em
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			""", (
+				kwargs['cnpj'],
+				kwargs['data_referencia'],
+				kwargs['versao'],
+				kwargs['razao_social'],
+				kwargs['codigo_cvm'],
+				kwargs['grupo'],
+				kwargs['moeda'],
+				kwargs['escala_moeda'],
+				kwargs['data_inicio_exercicio'],
+				kwargs['data_fim_exercicio'],
+				kwargs['codigo_conta'],
+				kwargs['descricao_conta'],
+				kwargs['valor_conta'],
+				kwargs['conta_fixa'],
+				kwargs['criado_em']
+			))
+			return (cur.rowcount or 0), ('inserted' if cur.rowcount == 1 else 'ignored')
+
+		except Exception as e:
+			
+			raise e
+		
 #         WITH ult AS (
 #     /* pega a última versão disponível por CNPJ + data + grupo */
 #     SELECT 

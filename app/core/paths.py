@@ -9,5 +9,5 @@ BACKUP_DIR = BASE_DIR / "backup"
 DEFAULT_DB_PATH = DATA_DIR / "dmarki.db"
 
 def ensure_dirs():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+	DATA_DIR.mkdir(parents=True, exist_ok=True)
+	BACKUP_DIR.mkdir(parents=True, exist_ok=True)

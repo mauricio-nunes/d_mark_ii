@@ -174,7 +174,7 @@ class ItrImportService:
 					lista_erros.append(f"ITR - documento {codigo_documento}: Erro no insert - {str(e)}")
 				
 				pbar.update(1)
-    
+	
 		self.repo.conn.commit()
 		return total_registros, inseridos, atualizados, ignorados, erros
 
@@ -214,9 +214,9 @@ class ItrImportService:
 			'codigo_cvm': row.get('CD_CVM', '').strip(),
 			'categoria_documento': row.get('CATEG_DOC', '').strip(),
 			'codigo_documento': parse_int(row.get('ID_DOC', '').strip()),
-   			'data_recebimento': parse_date(row.get('DT_RECEB', '').strip()),
-      		'link_documento': row.get('LINK_DOC', '').strip(),
-        	'criado_em': now_utc
+			'data_recebimento': parse_date(row.get('DT_RECEB', '').strip()),
+			'link_documento': row.get('LINK_DOC', '').strip(),
+			'criado_em': now_utc
 		}
 		
 		return data
@@ -318,7 +318,7 @@ class ItrImportService:
    			'qtde_acao_ordinaria_tesouraria' : parse_int(row.get('QT_ACAO_ORDIN_TESOURO',0)),
    			'qtde_acao_preferencial_tesouraria' : parse_int(row.get('QT_ACAO_PREF_TESOURO',0)),
    			'qtde_acao_total_tesouraria' : parse_int(row.get('QT_ACAO_TOTAL_TESOURO',0)),
-        	'criado_em': now_utc
+			'criado_em': now_utc
 		}
 		
 		return data
@@ -337,7 +337,7 @@ class ItrImportService:
 
 		with open(csv_path, 'r', encoding='latin1') as f:
 			reader = csv.DictReader(f, delimiter=';', quoting=csv.QUOTE_NONE, escapechar='\\')
-    
+	
 			for row_num, row in enumerate(reader, start=2):
 				try:
 					# Mapear dados do CSV para o formato esperado
@@ -441,7 +441,7 @@ class ItrImportService:
 					lista_erros.append(f"ITR - Balanço Patrimonial documento {codigo_documento}: Erro no insert - {str(e)}")
 				
 				pbar.update(1)
-    
+	
 		self.repo.conn.commit()
 		return total_registros, inseridos, atualizados, ignorados, erros
 
@@ -500,7 +500,7 @@ class ItrImportService:
 			'descricao_conta' : row.get('DS_CONTA', '').strip(),
 			'valor_conta' : row.get('VL_CONTA', '').strip(),
 			'conta_fixa' : conta_fixa,
-        	'criado_em': now_utc,
+			'criado_em': now_utc,
 			'exercicio' : row.get('ORDEM_EXERC','').strip()
 		}
 		
@@ -564,7 +564,7 @@ class ItrImportService:
 					lista_erros.append(f"ITR - Demonstrativo de Resultado {codigo_documento}: Erro no insert - {str(e)}")
 				
 				pbar.update(1)
-    
+	
 		self.repo.conn.commit()
 		return total_registros, inseridos, atualizados, ignorados, erros
 
@@ -622,7 +622,7 @@ class ItrImportService:
 			'descricao_conta' : row.get('DS_CONTA', '').strip(),
 			'valor_conta' : row.get('VL_CONTA', '').strip(),
 			'conta_fixa' : conta_fixa,
-        	'criado_em': now_utc,
+			'criado_em': now_utc,
 			'exercicio' : row.get('ORDEM_EXERC','').strip()
 		}
 		

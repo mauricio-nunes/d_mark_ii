@@ -1,7 +1,3 @@
-Aqui está o **copilot-instructions** atualizado com as diretivas de arquitetura e o uso de **tabulate** e **colorama** para relatórios:
-
----
-
 # Copilot Instructions — D Mark I
 
 ## Project
@@ -55,8 +51,8 @@ app/
 	ui/
 	services/
 	db/
-   repositories/
-   migrations/
+		repositories/
+		migrations/
 	core/
 		__init__.py  # domain models, errors, utils
 ```
@@ -78,15 +74,16 @@ app/
 
 * Tables/reports **must** use:
 
-  * **tabulate** for tabular output (e.g., `tablefmt='fancy_grid'` or `github` when copying).
-  * **colorama** for highlights (headers, totals, gains/losses).
+	* The preferred library for UI formatting is now **Rich**.  
+	* Older code using `tabulate` and `colorama` remains supported but should be gradually migrated.
+
 
 * Keep all **formatting in `ui/`** (no colors/tables in services or repositories).
 * Provide helpers in `ui/formatters.py`:
 
-  * `render_table(rows, headers, tablefmt='fancy_grid')`
-  * `paint_gain_loss(value)` → green/red using colorama
-  * `paint_header(text)` → styled section headers
+	* `render_table(rows, headers, tablefmt='fancy_grid')`
+	* `paint_gain_loss(value)` → green/red using colorama
+	* `paint_header(text)` → styled section headers
 * Always include totals/summary rows where applicable.
 * All CLI messages and labels **in PT-BR**.
 
@@ -95,14 +92,14 @@ app/
 * Commit types: `feature`, `bug`, `chore`, `spike`.
 * Format: `<type> : short description`
 
-  * Ex: `feature : import monthly CVM positions`
+	* Ex: `feature : import monthly CVM positions`
 * PR checklist:
 
-  * [ ] Tested CLI locally
-  * [ ] Handled network errors/timeouts
-  * [ ] No secrets committed
-  * [ ] Respects **UI/Services/Repositories/Core** layering
-  * [ ] Tables use **tabulate**; colors via **colorama** in `ui/`
+	* [ ] Tested CLI locally
+	* [ ] Handled network errors/timeouts
+	* [ ] No secrets committed
+	* [ ] Respects **UI/Services/Repositories/Core** layering
+	* [ ] Tables use **tabulate**; colors via **colorama** in `ui/`
 
 ## Code Review focus
 
@@ -119,5 +116,3 @@ app/
 * Never expose secrets.
 * Recommend **environment variables** for credentials.
 * Validate/sanitize CLI user input.
-
----

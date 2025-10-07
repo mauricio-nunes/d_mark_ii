@@ -7,8 +7,24 @@ from .importacao.menu import importacao_loop
 from .backup.menu import backup_loop
 
 
+def iniciar_terminal_interativo():
+	"""Inicia o CLI interativo com Typer."""
+	from .cli.interactive_shell import interactive_shell
+	
+	clear_screen()
+	title("Terminal Interativo")
+	
+	try:
+		interactive_shell.run()
+	except KeyboardInterrupt:
+		print("\nTerminal interativo interrompido.")
+	except Exception as e:
+		print(f"Erro no terminal interativo: {e}")
+
+
 MAIN_ITEMS = [
     "Importação",
+    "Terminal Interativo",
     "Database - Backup/Restore",
     "Sair"
 ]
@@ -32,6 +48,9 @@ def handle_main_choice(choice: str) -> bool:
             importacao_loop()
             pause()
         case "2":
+            iniciar_terminal_interativo()
+            pause()
+        case "3":
             backup_loop()
             pause()
         case "0" | "q" | "sair" | "exit":

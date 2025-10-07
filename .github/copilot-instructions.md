@@ -9,15 +9,6 @@
 * **Data Sources**: CVM APIs, B3 files, manual imports (CSV/XLSX)
 * **Key Features**: FCA/ITR/DFP imports, portfolio tracking, financial analysis, user authentication
 
-## Goals for Copilot
-
-* Generate/refactor **Python CLI** code (data parsing, calculations, imports, downloads).
-* Implement **Brazilian financial market** specific logic (CNPJ validation, CVM formats, B3 standards).
-* Suggest proper **error handling**, **timeouts**, **retries**, and **progress indicators** (tqdm).
-* Assist with **database migrations**, **SQLite optimizations**, and **data integrity**.
-* Help with **GitHub Issues**, **commit messages**, and **PR reviews**.
-* Focus on **user experience** with clear Portuguese messages and intuitive workflows.
-
 ## Style
 
 * Quotes: **single quotes** in Python.
@@ -82,7 +73,52 @@ app/
 		xlsx.py           # Excel file readers using openpyxl
 ```
 
+## CLI CRUD Pattern (Typer + Rich)
 
+* All CRUDs must be implemented as interactive commands using **Typer** (==0.9.0), grouped by domain (e.g., companies, users).
+* Use **Rich** for prompts, tables, panels, and visual feedback. All messages and labels must be in **PT-BR** (Portuguese).
+* The CLI should be accessible via the main menu and also directly through the Typer command.
+* When only the main command is entered (e.g., `empresas`), display the available subcommands with descriptions.
+* The `/help` command must be available in all command groups.
+* The terminal must correctly restore its state after exiting the interactive CLI (no session lock or duplication).
+* Error and validation messages must be clear, always in Portuguese.
+* Follow the architecture pattern: UI (Typer/Rich) → Services → Repositories → Core. Never mix responsibilities.
+* CRUDs must follow this template:
+	- **Repository**: CRUD methods, parameterized SQL, no business logic.
+	- **Service**: validation, business rules, orchestration, custom errors.
+	- **UI/CLI**: Typer commands, Rich prompts, tables, visual feedback.
+
+
+### Example CLI CRUD Structure
+
+```
+app/ui/cli/commands/empresas.py   # Typer commands for companies
+app/services/empresas/empresa_config_service.py
+app/db/repositories/empresas/empresa_config_repo.py
+app/db/migrations/000X_empresas_config.sql
+```
+
+### Corrections and UX
+
+* Always test the CLI after changes: commands, navigation, terminal state.
+* Ensure `/help` works in all command groups.
+* When only the command name is entered, show subcommands and descriptions.
+* Fix any session lock or duplication in the terminal.
+
+
+### Implementation Reference
+
+* See examples and patterns in `app/ui/cli/commands/base.py` and `app/ui/cli/interactive_shell.py`.
+* Always follow the architecture and UX pattern described above.
+
+## Goals for Copilot
+
+* Generate/refactor **Python CLI** code (data parsing, calculations, imports, downloads).
+* Implement **Brazilian financial market** specific logic (CNPJ validation, CVM formats, B3 standards).
+* Suggest proper **error handling**, **timeouts**, **retries**, and **progress indicators** (tqdm).
+* Assist with **database migrations**, **SQLite optimizations**, and **data integrity**.
+* Help with **GitHub Issues**, **commit messages**, and **PR reviews**.
+* Focus on **user experience** with clear Portuguese messages and intuitive workflows.
 
 ## Database (SQLite)
 

@@ -102,9 +102,7 @@ class EmpresaConfigRepo:
 		valores.append(id)
 		cur = self.conn.cursor()
 		sql = (
-			"UPDATE empresas_config "
-			"SET " + ", ".join(set_clauses) +
-			" WHERE id = ?"
+			f"UPDATE empresas_config SET {', '.join(set_clauses)} WHERE id = ?"
 		)
 		cur.execute(sql, valores)
 		self.conn.commit()

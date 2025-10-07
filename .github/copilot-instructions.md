@@ -1,8 +1,8 @@
-# Copilot Instructions — D Mark II
+# Copilot Instructions — D Mark I
 
 ## Project Overview
 
-* **Name**: D Mark II
+* **Name**: D Mark I
 * **Type**: CLI for tracking and analyzing investments in **Stocks** and **REITs (FIIs)**
 * **Language**: Python 3.11+ with **SQLite**
 * **Domain**: Brazilian financial market (CVM, B3 integrations)
@@ -51,6 +51,7 @@ Use the current layered architecture and keep dependencies **one-directional**:
 
 **Current folder structure**
 
+
 ```
 app/
 	ui/
@@ -62,6 +63,7 @@ app/
 		menu.py           # main navigation loops
 	services/
 		importacao/       # CVM import services (FCA, ITR, DFP)
+		empresas/         # company management services
 		auth_service.py   # login flow, password validation
 		backup_service.py # backup/restore operations
 		config_service.py # user preferences management
@@ -70,6 +72,7 @@ app/
 		bootstrap.py      # migrations runner + admin user seed
 		repositories/
 			importacao/   # CVM data repositories
+			empresas/     # company data repositories
 			usuarios/     # user management repositories
 		migrations/       # SQL migration files (####_description.sql)
 	core/
@@ -110,12 +113,15 @@ app/
   * **tabulate** for tabular output (e.g., `tablefmt='fancy_grid'` or `github` when copying).
   * **colorama** for highlights (headers, totals, gains/losses).
 
-* Keep all **formatting in `ui/`** (no colors/tables in services or repositories).
-* Provide helpers in `ui/formatters.py`:
-
-  * `render_table(rows, headers, tablefmt='fancy_grid')`
-  * `paint_gain_loss(value)` → green/red using colorama
-  * `paint_header(text)` → styled section headers
+* Keep all **formatting em `core/formatters.py`** (centralizado).
+* Helpers disponíveis em `core/formatters.py`:
+	* `render_table(rows, headers, tablefmt='fancy_grid')`
+	* `paint_gain_loss(value)` → verde/vermelho usando colorama
+	* `paint_header(text)` → cabeçalhos estilizados
+	* `fmt_money(value)` → valores monetários formatados
+	* `fmt_qty(value)` → quantidades formatadas
+	* `fmt_pct(value)` → percentuais formatados
+	* `fmt_profit(value)` → lucro/prejuízo com cor
 * Always include totals/summary rows where applicable.
 * All CLI messages and labels **in PT-BR**.
 
@@ -163,7 +169,7 @@ app/
   * [ ] Handled network errors/timeouts
   * [ ] No secrets committed
   * [ ] Respects **UI/Services/Repositories/Core** layering
-  * [ ] Tables use **tabulate**; colors via **colorama** in `ui/`
+  * [ ] Tables use **tabulate**; colors via **colorama** em `core/formatters.py`
   * [ ] CNPJ validation implemented where needed
   * [ ] Progress bars for long operations
   * [ ] Portuguese messages for users
@@ -183,8 +189,11 @@ app/
 ## Environment Setup
 
 * Python 3.11+ required.
-* Dependencies: see `requirements.txt` (bcrypt, colorama, pyfiglet, pandas, openpyxl, tabulate, requests, tqdm).
-* Environment variables via `.env` file (see `.env.example`).
+* Dependencies: see `requirements.txt` (bcrypt, colorama, pyfiglet, pandas, openpyxl, tabulate, requests, tqdm, python-dotenv).
+* Environment variables via `.env` file (see `.env.example`):
+	* `DMARKI_DB_PATH` - Caminho do banco de dados
+	* `DMARKI_FIGLET_FONT` - Fonte do splash
+	* `DMARKI_PAGE_SIZE` - Tamanho padrão de paginação
 * SQLite database auto-created on first run.
 * Default admin user: `admin/admin` (must change on first login).
 

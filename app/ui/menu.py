@@ -10,6 +10,7 @@ from .backup.menu import backup_loop
 MAIN_ITEMS = [
     "Importação",
     "Database - Backup/Restore",
+    "Manutenção de Cadastros",
     "Sair"
 ]
 
@@ -33,6 +34,10 @@ def handle_main_choice(choice: str) -> bool:
             pause()
         case "2":
             backup_loop()
+            pause()
+        case "3":
+            from .empresas.menu import manutencao_cadastros_menu
+            manutencao_cadastros_menu()
             pause()
         case "0" | "q" | "sair" | "exit":
             return False

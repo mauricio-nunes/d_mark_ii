@@ -70,7 +70,7 @@ app/
 * Normalize dates (`yyyy-mm-dd` or `dd/mm/yyyy`).
 * Use **timeouts + retry with jitter** in API calls.
 
-## UI & Reports (tabulate + colorama)
+## UI & Reports
 
 * Tables/reports:
 

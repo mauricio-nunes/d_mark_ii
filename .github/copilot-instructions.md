@@ -72,18 +72,14 @@ app/
 
 ## UI & Reports (tabulate + colorama)
 
-* Tables/reports **must** use:
+* Tables/reports:
 
 	* The preferred library for UI formatting is now **Rich**.  
 	* Older code using `tabulate` and `colorama` remains supported but should be gradually migrated.
 
 
 * Keep all **formatting in `ui/`** (no colors/tables in services or repositories).
-* Provide helpers in `ui/formatters.py`:
-
-	* `render_table(rows, headers, tablefmt='fancy_grid')`
-	* `paint_gain_loss(value)` → green/red using colorama
-	* `paint_header(text)` → styled section headers
+* Provide helpers in `ui/formatters.py` for common patterns.
 * Always include totals/summary rows where applicable.
 * All CLI messages and labels **in PT-BR**.
 

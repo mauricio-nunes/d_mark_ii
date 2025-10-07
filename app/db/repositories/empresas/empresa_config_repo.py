@@ -101,9 +101,9 @@ class EmpresaConfigRepo:
 			return self.obter_por_id(id)
 		valores.append(id)
 		cur = self.conn.cursor()
-		sql = (
-			f"UPDATE empresas_config SET {', '.join(set_clauses)} WHERE id = ?"
-		)
+		# Build the SQL query dynamically, but only using allowed fields for SET clause.
+		# All values are passed as parameters to prevent SQL injection.
+		sql = "UPDATE empresas_config SET " + ", ".join(set_clauses) + " WHERE id = ?"
 		cur.execute(sql, valores)
 		self.conn.commit()
 		return self.obter_por_id(id)

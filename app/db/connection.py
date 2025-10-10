@@ -6,6 +6,7 @@ load_dotenv()
 
 DB_PATH = os.getenv("DMARKI_DB_PATH", "./data/dmarki.db")
 
+
 def get_conn() -> sqlite3.Connection:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)

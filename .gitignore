@@ -165,6 +165,10 @@ cython_debug/
 data/
 
 # Processed import files
+import/
 imports/
+import/processed/
 imports/processed/
+export/
 exports/
+backup/

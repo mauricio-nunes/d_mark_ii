@@ -1,57 +1,108 @@
-from colorama import Fore, Style
-from ..widgets import header, pause
+from ..widgets import (
+    pause,
+    divider,
+    title,
+    show_menu_options,
+    prompt_menu_choice,
+    print_dict,
+)
+from ..forms import (
+    rich_label_error,
+    rich_label_warning,
+    rich_label_info,
+    rich_label,
+    rich_label_success,
+)
 from ...core.paths import BACKUP_DIR
 from ...services.backup_service import list_backups, make_backup, restore_from
+from ...core.utils import clear_screen
 
-def _input(t): 
-    return input(Fore.WHITE + t + Style.RESET_ALL)
+
+MENU_ITENS = ["Fazer Backup agora", "Restaurar de um Backup", "Voltar"]
+
 
 def tela_backup():
-    header("Backup do Banco")
+    clear_screen()
+    divider()
+    title("Backup do Banco")
+    divider()
     try:
         dst = make_backup()
-        print(f"Backup criado: {dst}")
+        print_dict({"Backup criado": str(dst)})
     except Exception as e:
-        print(f"Erro no backup: {e}")
+        rich_label_error(f"Erro no backup: {e}")
     pause()
 
+
 def tela_restore():
-    header("Restore do Banco", {"Diretório": str(BACKUP_DIR)})
+    clear_screen()
+    divider()
+    title("Restore do Banco")
+    divider()
+    print_dict({"Diretório de Backups": str(BACKUP_DIR)})
+    divider()
     bks = list_backups()
+
     if not bks:
-        print("Nenhum backup encontrado."); pause(); return
-    print("Backups (mais recentes primeiro):")
+        rich_label_warning("Nenhum backup encontrado.")
+        pause()
+        return
+    rich_label_info("Backups (mais recentes primeiro):")
     for i, p in enumerate(bks, start=1):
-        print(f" {i:>2}. {p.name}")
-    ch = _input("Número do backup para restaurar (ou ENTER p/ cancelar): ").strip()
-    if not ch: return
+        rich_label(f" {i:>2}. {p.name}")
+    ch = prompt_menu_choice(
+        "\nNúmero do backup para restaurar (ou ENTER p/ cancelar): "
+    ).strip()
+    if not ch:
+        return
     try:
-        idx = int(ch)-1
+        idx = int(ch) - 1
         sel = bks[idx]
     except Exception:
-        print("Opção inválida."); pause(); return
+        rich_label_error("Opção inválida.")
+        pause()
+        return
 
-    print(f"\nATENÇÃO: isso vai sobrescrever o banco atual por {sel.name}!")
-    conf = _input("Digite 'RESTAURAR' para confirmar: ").strip().upper()
+    rich_label_warning(
+        f"\nATENÇÃO: isso vai sobrescrever o banco atual por {sel.name}!"
+    )
+    conf = prompt_menu_choice("Digite 'RESTAURAR' para confirmar: ").strip().upper()
     if conf != "RESTAURAR":
-        print("Cancelado."); pause(); return
+        rich_label_info("Cancelado.")
+        pause()
+        return
 
     try:
         restore_from(sel)
-        print("Restore concluído com sucesso.")
+        rich_label_success("Restore concluído com sucesso.")
     except Exception as e:
-        print(f"Erro no restore: {e}")
+        rich_label_error(f"Erro no restore: {e}")
     pause()
 
+
+def handle_main_choice(choice: str) -> bool:
+    match choice.lower():
+        case "1":
+            tela_backup()
+        case "2":
+            tela_restore()
+        case "0" | "q" | "sair" | "exit":
+            return False
+        case _:
+            rich_label_error("Opção inválida.")
+            pause()
+    return True
+
+
 def backup_loop():
+
     keep = True
     while keep:
-        header("Backup/Restore")
-        print("1. Fazer Backup agora")
-        print("2. Restaurar de um Backup")
-        print("3. Voltar")
-        ch = _input("> ").strip()
-        match ch:
-            case "1": tela_backup()
-            case "2": tela_restore()
-            case _: keep = False
+        clear_screen()
+        divider()
+        title("Backup/Restore")
+        divider()
+        show_menu_options(MENU_ITENS)
+        divider()
+        choice = prompt_menu_choice()
+        keep = handle_main_choice(choice)

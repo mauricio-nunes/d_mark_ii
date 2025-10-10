@@ -20,11 +20,11 @@
 
 ## Style
 
-* Quotes: **single quotes** in Python.
-* Indentation: **TAB** (not spaces).
+* Quotes: **double quotes** in Python.
+* Indentation: **SPACES** (not tabs).
 * Naming: `snake_case` (functions/vars), `PascalCase` (classes).
 * Messages/CLI output: **Portuguese (PT-BR)**.
-* Follow repo linting rules; **do not auto-convert tabs to spaces**.
+* Follow repo linting rules; **do not auto-convert spaces to tabs**.
 
 ## Architecture (MUST FOLLOW)
 
@@ -51,19 +51,16 @@ Use the current layered architecture and keep dependencies **one-directional**:
 
 **Current folder structure**
 
-
 ```
 app/
 	ui/
-		backup/           # backup UI flows
-		importacao/       # import UI flows
+		module_name/      # UI module flows (e.g., importacao, relatorios)
 		widgets.py        # common UI components (header, pause, confirm)
-		prompts.py        # input helpers (username, password)
+		forms.py          # input ,labels helpers
 		splash.py         # startup screen with pyfiglet
 		menu.py           # main navigation loops
 	services/
-		importacao/       # CVM import services (FCA, ITR, DFP)
-		empresas/         # company management services
+		module_name/      # domain-specific services (e.g., importacao, relatorios)
 		auth_service.py   # login flow, password validation
 		backup_service.py # backup/restore operations
 		config_service.py # user preferences management
@@ -71,16 +68,12 @@ app/
 		connection.py     # SQLite connection factory
 		bootstrap.py      # migrations runner + admin user seed
 		repositories/
-			importacao/   # CVM data repositories
-			empresas/     # company data repositories
-			usuarios/     # user management repositories
+			module_name/  # domain-specific repositories (e.g., cia_aberta, fca)
 		migrations/       # SQL migration files (####_description.sql)
 	core/
-		__init__.py       # domain models, errors, utils
-		formatters.py     # tabulate/colorama helpers
 		security.py       # bcrypt password hashing
 		paths.py          # directory constants (DATA_DIR, BACKUP_DIR)
-		utils.py          # CNPJ validation, date parsing, URL validation
+		utils.py          # Common utils like parse data , validate (e.g., CNPJ validation, date parsing, URL validation)
 		decimal_ctx.py    # precise money calculations with Decimal
 		xlsx.py           # Excel file readers using openpyxl
 ```
@@ -93,7 +86,7 @@ app/
 * Follow migration pattern: `app/db/migrations/####_description.sql` with version control in `_migrations` table.
 * Always close cursors/connections.
 * Use `sqlite3.Row` factory for dict-like access to results.
-* Implement upsert patterns for CVM data with duplicate handling.
+* Use transactions for multi-step operations.
 * Repository pattern: one repo per domain entity (e.g., `CiaAbertaFcaRepo`, `UsuarioRepo`).
 
 ## Networking & I/O
@@ -102,7 +95,7 @@ app/
 * Handle **encoding** (UTF-8 + fallback to latin1 for CVM CSV files).
 * Normalize dates (`yyyy-mm-dd` format internally) and CNPJ (14 digits with validation).
 * Use **timeouts + retry with jitter** in API calls.
-* Implement **progress bars** with `tqdm` for long-running imports.
+* Implement **progress bars** for long-running imports.
 * Clean up **temporary files** after ZIP extraction.
 * Handle **CSV delimiters** correctly (`;` for CVM, `,` for B3).
 
@@ -110,18 +103,12 @@ app/
 
 * Tables/reports:
 
-	* The preferred library for UI formatting is now **Rich**.  
-	* Older code using `tabulate` and `colorama` remains supported but should be gradually migrated.
+	* The preferred library for UI formatting is **Rich**.  
+	* All table rendering and color formatting should use Rich components.
 
-* Keep all **formatting em `core/formatters.py`** (centralizado).
-* Helpers disponíveis em `core/formatters.py`:
-	* `render_table(rows, headers, tablefmt='fancy_grid')`
-	* `paint_gain_loss(value)` → verde/vermelho usando colorama
-	* `paint_header(text)` → cabeçalhos estilizados
-	* `fmt_money(value)` → valores monetários formatados
-	* `fmt_qty(value)` → quantidades formatadas
-	* `fmt_pct(value)` → percentuais formatados
-	* `fmt_profit(value)` → lucro/prejuízo com cor
+* Use `ui/forms.py` for consistent UI formatting and design (tables, forms, labels).
+* Use `ui/widgets.py` for common UI components (header, pause, confirm).
+* Use `core/utils.py` for consistent formatting and parsing data (e.g., CNPJ validation, date parsing, URL validation).
 * Always include totals/summary rows where applicable.
 * All CLI messages and labels **in PT-BR**.
 
@@ -131,7 +118,6 @@ app/
 * **Date parsing**: Use `parse_date()` to convert CVM dates to ISO format.
 * **URL validation**: Use `validate_url()` and `parse_url()` for web addresses.
 * **Money calculations**: Use `decimal_ctx.py` with `money()` and `qty()` for precision.
-* **CVM imports**: Follow consolidation pattern (latest document_id wins per CNPJ).
 * **Progress tracking**: Use `tqdm` for all long-running operations.
 
 ## Authentication & Security
@@ -169,27 +155,27 @@ app/
   * [ ] Handled network errors/timeouts
   * [ ] No secrets committed
   * [ ] Respects **UI/Services/Repositories/Core** layering
-  * [ ] Tables use **tabulate**; colors via **colorama** em `core/formatters.py`
+  <!-- * [ ] Tables use **Rich**; colors via **Rich markup** em `core/formatters.py` -->
   * [ ] CNPJ validation implemented where needed
   * [ ] Progress bars for long operations
   * [ ] Portuguese messages for users
 
 ## Code Review focus
 
-* Enforce **single quotes + TAB**.
+* Enforce **double quotes + SPACE**.
 * Suggest simplifications (short funcs, avoid deep nesting).
 * Check I/O safety (file exists, encoding, permissions).
 * SQL must use **parameters**.
 * Normalize dates and currency explicitly.
 * Validate architecture boundaries (no UI in services; no DB in UI).
-* Ensure reports use `ui/formatters` with **tabulate** and **colorama**.
+* Ensure reports use `core/formatters` with **Rich**.
 * Verify CNPJ normalization and validation.
 * Check for proper error handling in imports.
 
 ## Environment Setup
 
 * Python 3.11+ required.
-* Dependencies: see `requirements.txt` (bcrypt, colorama, pyfiglet, pandas, openpyxl, tabulate, requests, tqdm, python-dotenv).
+* Dependencies: see `requirements.txt` (bcrypt, rich, pyfiglet, pandas, openpyxl, requests, tqdm, python-dotenv).
 * Environment variables via `.env` file (see `.env.example`):
 	* `DMARKI_DB_PATH` - Caminho do banco de dados
 	* `DMARKI_FIGLET_FONT` - Fonte do splash

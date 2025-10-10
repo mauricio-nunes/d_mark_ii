@@ -1,28 +1,80 @@
-from colorama import Fore, Style
 from datetime import datetime
-from ..widgets import title, pause
+from rich.console import Console
+from ..forms import (
+    rich_label_error,
+    rich_label_info,
+    rich_label_warning,
+    rich_edit_input,
+    rich_label,
+)
+from ..widgets import (
+    title,
+    pause,
+    divider,
+    show_menu_options,
+    prompt_menu_choice,
+    print_dict,
+    render_table,
+)
 from ...core.utils import clear_screen
-from ...core.formatters import render_table, paint_header, paint_success, paint_warning, paint_error
-from ...services.importacao.fca_import_service import FcaImportService , ValidationError
+from ...services.importacao.fca_import_service import FcaImportService, ValidationError
 from ...services.importacao.itr_import_service import ItrImportService
 from ...services.importacao.dfp_import_service import DfpImportService
 
+console = Console()
 
+MENU_ITENS = [
+    "CVM - FCA | Cadastro de Empresas",
+    "CVM - ITR | Informações Trimestrais",
+    "CVM - DFP | Informações Anuais",
+    "B3 | Posição consolidada",
+    "B3 | Movimentação",
+    "Voltar",
+]
+
+
+def handle_menu_choice(choice: str) -> bool:
+    match choice.lower():
+        case "1":
+            importar_fca_cadastro_empresas_flow()
+        case "2":
+            importar_itr_flow()
+        case "3":
+            importar_dfp_flow()
+        case "4":
+            rich_label_info("Em desenvolvimento...")
+            pause()
+        case "5":
+            rich_label_info("Em desenvolvimento...")
+            pause()
+        case "0" | "q" | "voltar" | "sair" | "exit" | "6":
+            return False
+        case _:
+            rich_label_error("Opção inválida.")
+            pause()
+    return True
+
+
+#! REMOVER DEPOIS DO REFACTORAMENTO
 def _input(t):
-    return input(Fore.WHITE + t + Style.RESET_ALL)
+    return console.input(f"[white]{t}[/white]")
 
-#* IMPORTACAO DFP - INFORMAÇÕES ANUAIS
+
+# * IMPORTACAO DFP - INFORMAÇÕES ANUAIS
 def importar_dfp_flow():
     """Importação DFP - Informações anuais de Empresas CVM com formatação tabular."""
     clear_screen()
+    divider()
     title("CVM - DFP | Importar Demontrações Financeiras Padronizadas")
+    divider()
 
     current_year = datetime.now().year
 
-    print("📋 " + paint_header("Formulário de Demontrações Finaneiras Padronizadas (DFP) - Companhias Abertas"))
-    print(f"   Fonte: CVM - Comissão de Valores Mobiliários")
-    print(f"   Período disponível: 2011 a {current_year}")
-    print()
+    header_dfp_text = {
+        "Fonte": "CVM - Formulário de Demonstrações Financeiras Padronizadas (DFP) - Companhias Abertas",
+        "Período Disponível": f"Período disponível: 2011 a {current_year}",
+    }
+    print_dict(header_dfp_text)
 
     year_input = _input(f"Informe o ano para importação [{current_year}]: ").strip()
 
@@ -30,27 +82,22 @@ def importar_dfp_flow():
         try:
             year = int(year_input)
             if year <= 2010:
-                print()
-                print(paint_error("❌ Erro: Ano deve ser maior que 2010"))
+                rich_label_error("O Ano deve ser maior que 2010")
                 pause()
                 return
             if year > current_year:
-                print()
-                print(paint_error(f"❌ Erro: Ano deve ser menor ou igual a {current_year}"))
+                rich_label_error(f"O Ano deve ser menor ou igual a {current_year}")
                 pause()
                 return
         except ValueError:
-            print()
-            print(paint_error("❌ Erro: Ano inválido"))
+            rich_label_error("O Ano deve ser um número válido")
             pause()
             return
     else:
         year = current_year
 
-    print()
-    print(f"🚀 Iniciando importação DFP para o ano {paint_header(year)}...")
-    print("   Este processo pode levar alguns minutos...")
-    print()
+    rich_label_info(f"🚀 Iniciando importação DFP para o ano {year}...")
+    rich_label_info("   Este processo pode levar alguns minutos...")
 
     try:
         dfp_service = DfpImportService()
@@ -58,67 +105,53 @@ def importar_dfp_flow():
 
         # Relatório final com tabela
         clear_screen()
-        title("Importação DFP - Relatório Final")
-        
-        print(f"📊 {paint_header('Ano:')} {year}")
-        print()
-        
+        title(f"Importação DFP - Relatório Final - Ano {year}")
+
         # Tabela de resultados
-        headers = ["Arquivo", "Total Registros", "Inseridos", "Atualizados", "Ignorados", "Erros" ]
+        headers = [
+            "Arquivo",
+            "Total Registros",
+            "Inseridos",
+            "Atualizados",
+            "Ignorados",
+            "Erros",
+        ]
         rows = resumo
-        
-        print(render_table(rows, headers, tablefmt='fancy_grid'))
-        print()
-        
-        #sum totals for resumo list
+
+        # sum totals for resumo list
         processados = sum(r[1] for r in resumo)
-        
-        print(f"📈 {paint_header('Total processado:')} {processados} registros")
-        
-        # Mostrar erros se houver
-        # if erros > 0 and lista_erros:
-        #     print()
-        #     print(paint_warning("⚠️  Detalhes dos erros:"))
-        #     # Mostrar apenas os primeiros 10 erros para não poluir a tela
-        #     for erro in lista_erros[:10]:
-        #         print(f"   • {erro}")
-        #     if len(lista_erros) > 10:
-        #         print(f"   • ... e mais {len(lista_erros) - 10} erros")
-        
-        print()
-        print(paint_success("✅ Importação concluída com sucesso!"))
+        render_table("Resumo da Importação DFP", processados, 1, 1, headers, rows)
+        rich_label_info("✅ Importação concluída com sucesso!")
 
     except ValidationError as e:
         clear_screen()
-        title(paint_error("Erro na Importação ITR"))
-        print()
-        print(paint_error(f"❌ {str(e)}"))
-        print()
-        print("Verifique os parâmetros e tente novamente.")
-        
+        rich_label_error("Erro na Importação ITR")
+        rich_label_error(f"❌ {str(e)}")
+        rich_label_error("Verifique os parâmetros e tente novamente.")
+
     except Exception as e:
         clear_screen()
-        title(paint_error("Erro Inesperado"))
-        print()
-        print(paint_error(f"❌ Erro durante importação: {str(e)}"))
-        print()
-        print("Verifique sua conexão de internet e tente novamente.")
+        rich_label_error("Erro Inesperado")
+        rich_label_error(f"❌ Erro durante importação: {str(e)}")
+        rich_label_error("Verifique sua conexão de internet e tente novamente.")
 
-    print()
     pause()
 
-#* IMPORTACAO ITR - INFORMAÇÕES TRIMESTRAIS
+
+# * IMPORTACAO ITR - INFORMAÇÕES TRIMESTRAIS
 def importar_itr_flow():
     """Importação ITR - Informações trimestrais de Empresas CVM com formatação tabular."""
     clear_screen()
+    divider()
     title("CVM - ITR | Importar Informações Trimestrais")
+    divider()
 
     current_year = datetime.now().year
-
-    print("📋 " + paint_header("Formulário de Informações Trimestrais (ITR) - Companhias Abertas"))
-    print(f"   Fonte: CVM - Comissão de Valores Mobiliários")
-    print(f"   Período disponível: 2011 a {current_year}")
-    print()
+    header_itr_text = {
+        "Fonte": "CVM - Formulário de Informações Trimestrais (ITR) - Companhias Abertas",
+        "Período Disponível": f"Período disponível: 2011 a {current_year}",
+    }
+    print_dict(header_itr_text)
 
     year_input = _input(f"Informe o ano para importação [{current_year}]: ").strip()
 
@@ -126,27 +159,25 @@ def importar_itr_flow():
         try:
             year = int(year_input)
             if year <= 2010:
-                print()
-                print(paint_error("❌ Erro: Ano deve ser maior que 2010"))
+
+                rich_label_error("O Ano deve ser maior que 2010")
                 pause()
                 return
             if year > current_year:
-                print()
-                print(paint_error(f"❌ Erro: Ano deve ser menor ou igual a {current_year}"))
+
+                rich_label_error(f"O Ano deve ser menor ou igual a {current_year}")
                 pause()
                 return
         except ValueError:
-            print()
-            print(paint_error("❌ Erro: Ano inválido"))
+
+            rich_label_error("O Ano deve ser um número válido")
             pause()
             return
     else:
         year = current_year
 
-    print()
-    print(f"🚀 Iniciando importação ITR para o ano {paint_header(year)}...")
-    print("   Este processo pode levar alguns minutos...")
-    print()
+    rich_label_info(f"🚀 Iniciando importação ITR para o ano {year}...")
+    rich_label_info("   Este processo pode levar alguns minutos...")
 
     try:
         itr_service = ItrImportService()
@@ -154,183 +185,148 @@ def importar_itr_flow():
 
         # Relatório final com tabela
         clear_screen()
-        title("Importação ITR - Relatório Final")
-        
-        print(f"📊 {paint_header('Ano:')} {year}")
-        print()
-        
+        title(f"Importação ITR - Relatório Final - Ano {year}")
+
         # Tabela de resultados
-        headers = ["Arquivo", "Total Registros", "Inseridos", "Atualizados", "Ignorados", "Erros" ]
+        headers = [
+            "Arquivo",
+            "Total Registros",
+            "Inseridos",
+            "Atualizados",
+            "Ignorados",
+            "Erros",
+        ]
         rows = resumo
-        
-        print(render_table(rows, headers, tablefmt='fancy_grid'))
-        print()
-        
-        #sum totals for resumo list
+
+        # sum totals for resumo list
         processados = sum(r[1] for r in resumo)
-        
-        print(f"📈 {paint_header('Total processado:')} {processados} registros")
-        
-        # Mostrar erros se houver
-        # if erros > 0 and lista_erros:
-        #     print()
-        #     print(paint_warning("⚠️  Detalhes dos erros:"))
-        #     # Mostrar apenas os primeiros 10 erros para não poluir a tela
-        #     for erro in lista_erros[:10]:
-        #         print(f"   • {erro}")
-        #     if len(lista_erros) > 10:
-        #         print(f"   • ... e mais {len(lista_erros) - 10} erros")
-        
-        print()
-        print(paint_success("✅ Importação concluída com sucesso!"))
+
+        render_table("Resumo da Importação ITR", processados, 1, 1, headers, rows)
+
+        rich_label_info("✅ Importação concluída com sucesso!")
 
     except ValidationError as e:
         clear_screen()
-        title(paint_error("Erro na Importação ITR"))
-        print()
-        print(paint_error(f"❌ {str(e)}"))
-        print()
-        print("Verifique os parâmetros e tente novamente.")
-        
+        rich_label_error("Erro na Importação ITR")
+        rich_label_error(f"❌ {str(e)}")
+        rich_label_error("Verifique os parâmetros e tente novamente.")
+
     except Exception as e:
         clear_screen()
-        title(paint_error("Erro Inesperado"))
-        print()
-        print(paint_error(f"❌ Erro durante importação: {str(e)}"))
-        print()
-        print("Verifique sua conexão de internet e tente novamente.")
+        rich_label_error("Erro Inesperado")
+        rich_label_error(f"❌ Erro durante importação: {str(e)}")
+        rich_label_error("Verifique sua conexão de internet e tente novamente.")
 
-    print()
     pause()
-    
-#* IMPORTACAO FCA - CADASTRO DE EMPRESAS CVM
+
+
+# * IMPORTACAO FCA - CADASTRO DE EMPRESAS CVM
 def importar_fca_cadastro_empresas_flow():
     """Importação FCA - Cadastro de Empresas CVM com formatação tabular."""
     clear_screen()
+    divider()
     title("CVM - FCA | Importar Cadastro de Empresas")
+    divider()
 
     current_year = datetime.now().year
 
-    print("📋 " + paint_header("Formulário Cadastral (FCA) - Companhias Abertas"))
-    print(f"   Fonte: CVM - Comissão de Valores Mobiliários")
-    print(f"   Período disponível: 2011 a {current_year}")
-    print()
+    header_fca_text = {
+        "Fonte": "CVM - Formulário Cadastral (FCA) - Companhias Abertas",
+        "Período Disponível": f"Período disponível: 2011 a {current_year}",
+    }
+    print_dict(header_fca_text)
 
-    year_input = _input(f"Informe o ano para importação [{current_year}]: ").strip()
+    year_input = rich_edit_input(
+        f"Informe o ano para importação: ", str(current_year)
+    ).strip()
 
     if year_input:
         try:
             year = int(year_input)
             if year <= 2010:
-                print()
-                print(paint_error("❌ Erro: Ano deve ser maior que 2010"))
+
+                rich_label_error("O Ano deve ser maior que 2010")
                 pause()
                 return
             if year > current_year:
-                print()
-                print(paint_error(f"❌ Erro: Ano deve ser menor ou igual a {current_year}"))
+                rich_label_error(f"O Ano deve ser menor ou igual a {current_year}")
                 pause()
                 return
         except ValueError:
-            print()
-            print(paint_error("❌ Erro: Ano inválido"))
+            rich_label_error("O Ano deve ser um número válido")
             pause()
             return
     else:
         year = current_year
 
-    print()
-    print(f"🚀 Iniciando importação FCA para o ano {paint_header(year)}...")
-    print("   Este processo pode levar alguns minutos...")
-    print()
+    rich_label_info(f"🚀 Iniciando importação FCA para o ano {year}...")
+    rich_label_info("   Este processo pode levar alguns minutos...")
 
     try:
         fca_service = FcaImportService()
-        inseridos, atualizados, ignorados, erros, lista_erros = fca_service.importar_fca_por_ano(year)
+        inseridos, atualizados, ignorados, erros, lista_erros = (
+            fca_service.importar_fca_por_ano(year)
+        )
 
         # Relatório final com tabela
         clear_screen()
-        title("Importação FCA - Relatório Final")
-        
-        print(f"📊 {paint_header('Ano:')} {year}")
-        print()
-        
+        title(f"Importação FCA - Relatório Final - Ano {year}")
+
         # Tabela de resultados
         headers = ["Operação", "Quantidade", "Descrição"]
         rows = [
-            ["Inseridas", paint_success(inseridos), "Novas empresas cadastradas"],
-            ["Atualizadas", paint_warning(atualizados), "Empresas com dados atualizados"],  
+            ["Inseridas", inseridos, "Novas empresas cadastradas"],
+            ["Atualizadas", atualizados, "Empresas com dados atualizados"],
             ["Ignoradas", ignorados, "Empresas com dados iguais/antigos"],
-            ["Erros", paint_error(erros), "Linhas com problemas de validação"]
+            ["Erros", erros, "Linhas com problemas de validação"],
         ]
-        
-        print(render_table(rows, headers, tablefmt='fancy_grid'))
-        print()
-        
-        total_processado = inseridos + atualizados + ignorados + erros
-        print(f"📈 {paint_header('Total processado:')} {total_processado} registros")
-        
+
+        render_table(
+            "Resumo da Importação FCA",
+            inseridos + atualizados + ignorados + erros,
+            1,
+            1,
+            headers,
+            rows,
+        )
+
         # Mostrar erros se houver
         if erros > 0 and lista_erros:
-            print()
-            print(paint_warning("⚠️  Detalhes dos erros:"))
+
+            rich_label_warning("⚠️  Detalhes dos erros:")
             # Mostrar apenas os primeiros 10 erros para não poluir a tela
             for erro in lista_erros[:10]:
-                print(f"   • {erro}")
+                rich_label(f"   • {erro}")
             if len(lista_erros) > 10:
-                print(f"   • ... e mais {len(lista_erros) - 10} erros")
-        
+                rich_label(f"   • ... e mais {len(lista_erros) - 10} erros")
+
         if inseridos > 0 or atualizados > 0:
-            print()
-            print(paint_success("✅ Importação concluída com sucesso!"))
+            rich_label_info("✅ Importação concluída com sucesso!")
 
     except ValidationError as e:
         clear_screen()
-        title(paint_error("Erro na Importação FCA"))
-        print()
-        print(paint_error(f"❌ {str(e)}"))
-        print()
-        print("Verifique os parâmetros e tente novamente.")
-        
+        rich_label_error("Erro na Importação FCA")
+        rich_label_error(f"❌ {str(e)}")
+        rich_label_error("Verifique os parâmetros e tente novamente.")
+
     except Exception as e:
         clear_screen()
-        title(paint_error("Erro Inesperado"))
-        print()
-        print(paint_error(f"❌ Erro durante importação: {str(e)}"))
-        print()
-        print("Verifique sua conexão de internet e tente novamente.")
+        rich_label_error("Erro Inesperado")
+        rich_label_error(f"❌ Erro durante importação: {str(e)}")
+        rich_label_error("Verifique sua conexão de internet e tente novamente.")
 
-    print()
     pause()
 
-#* MENU DE IMPORTAÇÃO
+
+# * MENU DE IMPORTAÇÃO
 def importacao_loop():
-    while True:
+    keep = True
+    while keep:
         clear_screen()
-        title("Importação")
-        print("1. [CVM - FCA] Cadastro Empresas")
-        print("2. [CVM - ITR] Informações Trimestrais")
-        print("3. [CVM - DFP] Informações Anuais")
-        print("4. [B3] Posição consolidada")
-        print("5. [B3] Movimentação")
-        print("6. [CVM] Cadastro de Fundos e Empresas")
-        print("8. Voltar")
-        ch = _input("> ").strip()
-        if ch == "1":
-            importar_fca_cadastro_empresas_flow()
-        elif ch == "2":
-            importar_itr_flow()
-            pause()
-        elif ch == "3":
-            importar_dfp_flow()
-            pause()
-        elif ch == "4":
-            #importar_movimentacao_b3_flow()
-            print("Em desenvolvimento...")
-            pause()
-        elif ch == "5":
-            #importar_fundos_empresas_flow()
-            print("Em desenvolvimento...")
-            pause()
-        else:
-            break
+        divider()
+        title("Importação de Dados")
+        divider()
+        show_menu_options(MENU_ITENS)
+        divider()
+        choice = prompt_menu_choice().strip()
+        keep = handle_menu_choice(choice)

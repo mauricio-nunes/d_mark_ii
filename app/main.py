@@ -1,5 +1,4 @@
 import os
-from colorama import init as colorama_init
 from app.ui.splash import splash
 from app.db.bootstrap import apply_migrations
 from app.core.utils import ensure_dirs
@@ -11,7 +10,6 @@ def main():
     # Transição simples
     os.system("cls" if os.name == "nt" else "clear")
 
-    colorama_init()
     ensure_dirs()
     splash()
     apply_migrations()
@@ -20,9 +18,6 @@ def main():
     user = None
     while not user:
         user = login_flow()
-
-    # Transição simples
-    os.system("cls" if os.name == "nt" else "clear")
 
     # Loop principal
     main_loop()

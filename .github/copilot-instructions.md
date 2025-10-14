@@ -69,7 +69,7 @@ app/
 		bootstrap.py      # migrations runner + admin user seed
 		repositories/
 			module_name/  # domain-specific repositories (e.g., cia_aberta, fca)
-		migrations/       # SQL migration files (####_description.sql)
+		migrations/       # SQL migration files
 	core/
 		security.py       # bcrypt password hashing
 		paths.py          # directory constants (DATA_DIR, BACKUP_DIR)
@@ -83,7 +83,7 @@ app/
 ## Database (SQLite)
 
 * Use **parameters** in queries, never string interpolation.
-* Follow migration pattern: `app/db/migrations/####_description.sql` with version control in `_migrations` table.
+* Follow migration pattern like: `app/db/migrations/0001_users.sql` with version control in `_migrations` table.
 * Always close cursors/connections.
 * Use `sqlite3.Row` factory for dict-like access to results.
 * Use transactions for multi-step operations.
@@ -155,7 +155,7 @@ app/
   * [ ] Handled network errors/timeouts
   * [ ] No secrets committed
   * [ ] Respects **UI/Services/Repositories/Core** layering
-  <!-- * [ ] Tables use **Rich**; colors via **Rich markup** em `core/formatters.py` -->
+  * [ ] Tables use **Rich**; colors via **Rich markup** em `core/formatters.py`
   * [ ] CNPJ validation implemented where needed
   * [ ] Progress bars for long operations
   * [ ] Portuguese messages for users

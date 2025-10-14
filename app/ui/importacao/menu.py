@@ -6,6 +6,7 @@ from ..forms import (
     rich_label_warning,
     rich_edit_input,
     rich_label,
+    rich_input
 )
 from ..widgets import (
     title,
@@ -55,9 +56,7 @@ def handle_menu_choice(choice: str) -> bool:
     return True
 
 
-#! REMOVER DEPOIS DO REFACTORAMENTO
-def _input(t):
-    return console.input(f"[white]{t}[/white]")
+
 
 
 # * IMPORTACAO DFP - INFORMAÇÕES ANUAIS
@@ -76,7 +75,7 @@ def importar_dfp_flow():
     }
     print_dict(header_dfp_text)
 
-    year_input = _input(f"Informe o ano para importação [{current_year}]: ").strip()
+    year_input = rich_input(f"Informe o ano para importação [{current_year}]: ").strip()
 
     if year_input:
         try:
@@ -153,7 +152,7 @@ def importar_itr_flow():
     }
     print_dict(header_itr_text)
 
-    year_input = _input(f"Informe o ano para importação [{current_year}]: ").strip()
+    year_input = rich_input(f"Informe o ano para importação [{current_year}]: ").strip()
 
     if year_input:
         try:

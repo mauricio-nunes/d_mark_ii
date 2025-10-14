@@ -2,6 +2,7 @@ from .widgets import title, divider, pause, show_menu_options, prompt_menu_choic
 from .forms import rich_label_error
 from .manutencao_cadastros.menu import manutencao_loop
 from .importacao.menu import importacao_loop
+from .balanco.menu import balanco_menu
 from .backup.menu import backup_loop
 from ..core.utils import clear_screen
 
@@ -9,9 +10,9 @@ MAIN_ITEMS = [
     "Importação",
     "Database - Backup/Restore",
     "Manutenção de Cadastros",
+    "Balanços",
     "Sair",
 ]
-
 
 def handle_main_choice(choice: str) -> bool:
     """
@@ -24,6 +25,8 @@ def handle_main_choice(choice: str) -> bool:
             backup_loop()
         case "3":
             manutencao_loop()
+        case "4":
+            balanco_menu()
         case "0" | "q" | "sair" | "exit":
             return False
         case _:

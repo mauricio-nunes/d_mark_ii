@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from ..widgets import (
     title,
@@ -16,9 +15,9 @@ from ..forms import (
     rich_edit_input,
     rich_label_success,
     rich_label,
-    rich_input
+    rich_input,
 )
-from ...core.utils import clear_screen, parse_cnpj
+from ...core.utils import clear_screen, ValidationError
 from app.services.balanco.balanco_service import BalancoService
 
 
@@ -26,6 +25,7 @@ MENU_ITENS = [
     "Exportar Balanço ",
     "Voltar",
 ]
+
 
 def handle_menu_choice(choice: str) -> bool:
     match choice.lower():
@@ -37,6 +37,7 @@ def handle_menu_choice(choice: str) -> bool:
             rich_label_error("Opção inválida.")
             pause()
     return True
+
 
 def balanco_menu():
     keep = True
@@ -50,6 +51,7 @@ def balanco_menu():
         choice = prompt_menu_choice()
         keep = handle_menu_choice(choice)
 
+
 # * PROCESSAMENTO DE BALANÇO
 def processar_balanco_flow():
     clear_screen()
@@ -61,7 +63,7 @@ def processar_balanco_flow():
 
     header_dfp_text = {
         "Fonte": "CVM - Formulário de Demonstrações Financeiras Padronizadas (DFP) - Companhias Abertas",
-        "Período Disponível": f"Período disponível: 2011 a {current_year}",
+        "Período Disponível": f"Período disponível: últimos 5 anos + Últimos 12 meses(TTM)",
     }
     print_dict(header_dfp_text)
 
@@ -71,39 +73,21 @@ def processar_balanco_flow():
         pause()
         return
 
-    year_input = rich_edit_input(f"Informe o ano para processar:", current_year)
-
-    if year_input:
-        try:
-            year = int(year_input)
-            if year <= 2010:
-                rich_label_error("O Ano deve ser maior que 2010")
-                pause()
-                return
-            if year > current_year:
-                rich_label_error(f"O Ano deve ser menor ou igual a {current_year}")
-                pause()
-                return
-        except ValueError:
-            rich_label_error("O Ano deve ser um número válido")
-            pause()
-            return
-    else:
-        year = current_year
-
-    rich_label_info(f"🚀 Iniciando o processamento do balanço da empresa {codigo_empresa} com DFP para o ano {year}...")
+    rich_label_info(
+        f"🚀 Iniciando o processamento dos balanços da empresa {codigo_empresa} ..."
+    )
     rich_label_info("   Este processo pode levar alguns minutos...")
     try:
-        
+
         service = BalancoService()
-        indicadores = service.calcular_balanco_por_codigo(codigo_empresa, year)
-        if indicadores:
-            table_data = []
-            for key, value in indicadores.items():
-                table_data.append([key, value])
-            render_table(table_data, headers=["Indicador", "Valor"], title=f"Indicadores Financeiros - {codigo_empresa} - {year}")
-            rich_label_success("✅ Processamento de indicadores concluído com sucesso!")
-        else:
-            rich_label_info("Nenhum indicador calculado.")
+        xlsx_path = service.calcular_balanco_por_codigo(codigo_empresa)
+
+        rich_label_success("✅ Processamento de indicadores concluído com sucesso!")
+        rich_label_info(f"   Arquivo gerado: {xlsx_path}")
+        pause()
+    except ValidationError as ve:
+        rich_label_error(f"Erro: {str(ve)}")
+        pause()
     except Exception as e:
-        rich_label_error(f"Erro ao processar indicadores: {str(e)}")
+        rich_label_error(f"Erro: {str(e)}")
+        pause()

@@ -71,6 +71,11 @@ def get_utc_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def get_formated_timestamp() -> str:
+    """Retorna timestamp atual no formato ISO sem fuso horário."""
+    return datetime.now().strftime("%Y%m%d%H%M%S")
+
+
 def normalize_cnpj(cnpj: str) -> str:
     cnpj_num = re.sub(r"\D", "", cnpj or "")
     return cnpj_num.zfill(14)

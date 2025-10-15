@@ -7,13 +7,16 @@ from ..core.paths import BACKUP_DIR, DEFAULT_DB_PATH, ensure_dirs
 
 CFG_DB_PATH = "db_path"  # opcional, se quiser armazenar caminho custom
 
+
 def _db_path() -> Path:
     # usa valor do config, se existir; senão, DEFAULT_DB_PATH
     return DEFAULT_DB_PATH
 
+
 def list_backups() -> List[Path]:
     ensure_dirs()
     return sorted(BACKUP_DIR.glob("dmarki_*.db"), reverse=True)
+
 
 def make_backup() -> Path:
     ensure_dirs()
@@ -24,6 +27,7 @@ def make_backup() -> Path:
     dst = BACKUP_DIR / f"dmarki_{stamp}.db"
     shutil.copy2(src, dst)
     return dst
+
 
 def restore_from(path: Path) -> None:
     ensure_dirs()

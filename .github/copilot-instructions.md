@@ -1,25 +1,30 @@
 # Copilot Instructions — D Mark I
 
-## Project
+## Project Overview
 
 * **Name**: D Mark I
 * **Type**: CLI for tracking and analyzing investments in **Stocks** and **REITs (FIIs)**
-* **Language**: Python with **SQLite**
-* **Integrations**: external APIs + CVM file downloads (CSV/XLSX)
+* **Language**: Python 3.11+ with **SQLite**
+* **Domain**: Brazilian financial market (CVM, B3 integrations)
+* **Data Sources**: CVM APIs, B3 files, manual imports (CSV/XLSX)
+* **Key Features**: FCA/ITR/DFP imports, portfolio tracking, financial analysis, user authentication
 
 ## Goals for Copilot
 
 * Generate/refactor **Python CLI** code (data parsing, calculations, imports, downloads).
-* Suggest proper **error handling**, **timeouts**, **retries**, and clear **logging**.
-* Assist with **GitHub Issues**, **commits**, and **PR reviews**.
+* Implement **Brazilian financial market** specific logic (CNPJ validation, CVM formats, B3 standards).
+* Suggest proper **error handling**, **timeouts**, **retries**, and **progress indicators** (tqdm).
+* Assist with **database migrations**, **SQLite optimizations**, and **data integrity**.
+* Help with **GitHub Issues**, **commit messages**, and **PR reviews**.
+* Focus on **user experience** with clear Portuguese messages and intuitive workflows.
 
 ## Style
 
-* Quotes: **single quotes** in Python.
-* Indentation: **TAB** (not spaces).
+* Quotes: **double quotes** in Python.
+* Indentation: **SPACES** (not tabs).
 * Naming: `snake_case` (functions/vars), `PascalCase` (classes).
 * Messages/CLI output: **Portuguese (PT-BR)**.
-* Follow repo linting rules; **do not auto-convert tabs to spaces**.
+* Follow repo linting rules; **do not auto-convert spaces to tabs**.
 
 ## Architecture (MUST FOLLOW)
 
@@ -44,44 +49,99 @@ Use the current layered architecture and keep dependencies **one-directional**:
 * Prefer `typing.Protocol` for repository/service interfaces.
 * Keep functions short; push branching to services; keep repositories thin.
 
-**Suggested folders**
+**Current folder structure**
 
 ```
 app/
 	ui/
+		module_name/      # UI module flows (e.g., importacao, relatorios)
+		widgets.py        # common UI components (header, pause, confirm)
+		forms.py          # input ,labels helpers
+		splash.py         # startup screen with pyfiglet
+		menu.py           # main navigation loops
 	services/
+		module_name/      # domain-specific services (e.g., importacao, relatorios)
+		auth_service.py   # login flow, password validation
+		backup_service.py # backup/restore operations
+		config_service.py # user preferences management
 	db/
+		connection.py     # SQLite connection factory
+		bootstrap.py      # migrations runner + admin user seed
 		repositories/
-		migrations/
+			module_name/  # domain-specific repositories (e.g., cia_aberta, fca)
+		migrations/       # SQL migration files
 	core/
-		__init__.py  # domain models, errors, utils
+		security.py       # bcrypt password hashing
+		paths.py          # directory constants (DATA_DIR, BACKUP_DIR)
+		utils.py          # Common utils like parse data , validate (e.g., CNPJ validation, date parsing, URL validation)
+		decimal_ctx.py    # precise money calculations with Decimal
+		xlsx.py           # Excel file readers using openpyxl
 ```
+
+
 
 ## Database (SQLite)
 
 * Use **parameters** in queries, never string interpolation.
-* Ensure migrations/checks before creating tables.
+* Follow migration pattern like: `app/db/migrations/0001_users.sql` with version control in `_migrations` table.
 * Always close cursors/connections.
+* Use `sqlite3.Row` factory for dict-like access to results.
+* Use transactions for multi-step operations.
+* Repository pattern: one repo per domain entity (e.g., `CiaAbertaFcaRepo`, `UsuarioRepo`).
 
 ## Networking & I/O
 
-* Validate **HTTP status**, **content-type**, **file size** when downloading.
-* Handle **encoding** (UTF-8 + fallback).
-* Normalize dates (`yyyy-mm-dd` or `dd/mm/yyyy`).
+* Validate **HTTP status**, **content-type**, **file size** when downloading CVM/B3 files.
+* Handle **encoding** (UTF-8 + fallback to latin1 for CVM CSV files).
+* Normalize dates (`yyyy-mm-dd` format internally) and CNPJ (14 digits with validation).
 * Use **timeouts + retry with jitter** in API calls.
+* Implement **progress bars** for long-running imports.
+* Clean up **temporary files** after ZIP extraction.
+* Handle **CSV delimiters** correctly (`;` for CVM, `,` for B3).
 
 ## UI & Reports
 
 * Tables/reports:
 
-	* The preferred library for UI formatting is now **Rich**.  
-	* Older code using `tabulate` and `colorama` remains supported but should be gradually migrated.
+	* The preferred library for UI formatting is **Rich**.  
+	* All table rendering and color formatting should use Rich components.
 
-
-* Keep all **formatting in `ui/`** (no colors/tables in services or repositories).
-* Provide helpers in `ui/formatters.py` for common patterns.
+* Use `ui/forms.py` for consistent UI formatting and design (tables, forms, labels).
+* Use `ui/widgets.py` for common UI components (header, pause, confirm).
+* Use `core/utils.py` for consistent formatting and parsing data (e.g., CNPJ validation, date parsing, URL validation).
 * Always include totals/summary rows where applicable.
 * All CLI messages and labels **in PT-BR**.
+
+## Domain-Specific Patterns
+
+* **CNPJ handling**: Use `normalize_cnpj()` and `valid_cnpj()` from `core/utils.py`.
+* **Date parsing**: Use `parse_date()` to convert CVM dates to ISO format.
+* **URL validation**: Use `validate_url()` and `parse_url()` for web addresses.
+* **Money calculations**: Use `decimal_ctx.py` with `money()` and `qty()` for precision.
+* **Progress tracking**: Use `tqdm` for all long-running operations.
+
+## Authentication & Security
+
+* User login with **bcrypt** password hashing.
+* Account lockout after 5 failed attempts.
+* Force password change on first login.
+* Environment variables for sensitive configuration.
+* Input validation for all user data.
+
+## Error Handling
+
+* Use custom `ValidationError` for business rule violations.
+* Handle network timeouts gracefully with user-friendly messages.
+* Provide detailed error reports for import failures.
+* Log errors but show clean messages to users in Portuguese.
+
+## Testing Considerations
+
+* Mock HTTP calls in service tests.
+* Use temporary databases for repository tests.
+* Test CNPJ validation edge cases.
+* Verify CSV parsing with malformed data.
+* Test authentication flows and lockout scenarios.
 
 ## Commits & PRs
 
@@ -91,24 +151,44 @@ app/
 	* Ex: `feature : import monthly CVM positions`
 * PR checklist:
 
-	* [ ] Tested CLI locally
-	* [ ] Handled network errors/timeouts
-	* [ ] No secrets committed
-	* [ ] Respects **UI/Services/Repositories/Core** layering
-	* [ ] Tables use **tabulate**; colors via **colorama** in `ui/`
+  * [ ] Tested CLI locally
+  * [ ] Handled network errors/timeouts
+  * [ ] No secrets committed
+  * [ ] Respects **UI/Services/Repositories/Core** layering
+  * [ ] Tables use **Rich**; colors via **Rich markup** em `core/formatters.py`
+  * [ ] CNPJ validation implemented where needed
+  * [ ] Progress bars for long operations
+  * [ ] Portuguese messages for users
 
 ## Code Review focus
 
-* Enforce **single quotes + TAB**.
+* Enforce **double quotes + SPACE**.
 * Suggest simplifications (short funcs, avoid deep nesting).
 * Check I/O safety (file exists, encoding, permissions).
 * SQL must use **parameters**.
 * Normalize dates and currency explicitly.
 * Validate architecture boundaries (no UI in services; no DB in UI).
-* Ensure reports use `ui/formatters` with **tabulate** and **colorama**.
+* Ensure reports use `core/formatters` with **Rich**.
+* Verify CNPJ normalization and validation.
+* Check for proper error handling in imports.
+
+## Environment Setup
+
+* Python 3.11+ required.
+* Dependencies: see `requirements.txt` (bcrypt, rich, pyfiglet, pandas, openpyxl, requests, tqdm, python-dotenv).
+* Environment variables via `.env` file (see `.env.example`):
+	* `DMARKI_DB_PATH` - Caminho do banco de dados
+	* `DMARKI_FIGLET_FONT` - Fonte do splash
+	* `DMARKI_PAGE_SIZE` - Tamanho padrão de paginação
+* SQLite database auto-created on first run.
+* Default admin user: `admin/admin` (must change on first login).
 
 ## Security
 
 * Never expose secrets.
 * Recommend **environment variables** for credentials.
 * Validate/sanitize CLI user input.
+* Use parameterized SQL queries only.
+* Hash passwords with bcrypt + salt.
+
+---

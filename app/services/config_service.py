@@ -3,9 +3,10 @@ from ..db.repositories import config_repo
 
 # Chaves de configuração
 CFG_FIGLET_FONT = "ui.figlet_font"
-CFG_THEME = "ui.theme"             # "dark"|"light"
-CFG_PAGE_SIZE = "ui.page_size"     # inteiro
-CFG_DB_PATH = "db_path"            # opcional
+CFG_THEME = "ui.theme"  # "dark"|"light"
+CFG_PAGE_SIZE = "ui.page_size"  # inteiro
+CFG_DB_PATH = "db_path"  # opcional
+
 
 class Prefs(TypedDict, total=False):
     figlet_font: str
@@ -13,10 +14,12 @@ class Prefs(TypedDict, total=False):
     page_size: int
     db_path: str
 
+
 def get_prefs() -> Prefs:
     def _g(k, d=None):
         v = config_repo.get_value(k)
         return v if v is not None else d
+
     pf: Prefs = {}
     ff = _g(CFG_FIGLET_FONT, "ansi_shadow")
     th = _g(CFG_THEME, "dark")
@@ -28,8 +31,10 @@ def get_prefs() -> Prefs:
     except Exception:
         pf["page_size"] = 20
     dbp = _g(CFG_DB_PATH, None)
-    if dbp: pf["db_path"] = dbp
+    if dbp:
+        pf["db_path"] = dbp
     return pf
+
 
 def set_prefs(p: Prefs) -> None:
     if "figlet_font" in p and p["figlet_font"]:

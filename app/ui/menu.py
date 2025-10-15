@@ -1,27 +1,18 @@
-from colorama import Fore, Style
-from .widgets import title, divider, pause
-from .prompts import prompt_menu_choice
-from ..core.utils import clear_screen
-
+from .widgets import title, divider, pause, show_menu_options, prompt_menu_choice
+from .forms import rich_label_error
+from .manutencao_cadastros.menu import manutencao_loop
 from .importacao.menu import importacao_loop
+from .balanco.menu import balanco_menu
 from .backup.menu import backup_loop
-
+from ..core.utils import clear_screen
 
 MAIN_ITEMS = [
     "Importação",
     "Database - Backup/Restore",
-    "Sair"
+    "Manutenção de Cadastros",
+    "Balanços",
+    "Sair",
 ]
-
-def show_main_menu():
-    title("Menu Principal")
-    for i, item in enumerate(MAIN_ITEMS, start=1):
-        if item == "Sair":
-            num = 0
-        else:
-            num = i
-        print(Fore.WHITE + f"{num}. {item}" + Style.RESET_ALL)
-    divider()
 
 def handle_main_choice(choice: str) -> bool:
     """
@@ -30,21 +21,29 @@ def handle_main_choice(choice: str) -> bool:
     match choice.lower():
         case "1":
             importacao_loop()
-            pause()
         case "2":
             backup_loop()
-            pause()
+        case "3":
+            manutencao_loop()
+        case "4":
+            balanco_menu()
         case "0" | "q" | "sair" | "exit":
             return False
         case _:
-            print("Opção inválida.")
+            rich_label_error("Opção inválida.")
             pause()
     return True
 
+
 def main_loop():
+
     keep = True
     while keep:
         clear_screen()
-        show_main_menu()
+        divider()
+        title("Menu Principal")
+        divider()
+        show_menu_options(MAIN_ITEMS)
+        divider()
         choice = prompt_menu_choice()
         keep = handle_main_choice(choice)
